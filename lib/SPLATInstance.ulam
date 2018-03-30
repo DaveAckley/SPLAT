@@ -1,0 +1,563 @@
+/** Parameters for controlling SPLAT execution
+   \symbol SP
+   \color #32c
+ */
+element SPLATControl {
+  /** Print keyset after given_ */
+  parameter Bool cPRINT_GIVEN = false; 
+
+  /** Print keyset after vote_ */
+  parameter Bool cPRINT_VOTE = false; 
+
+  /** Print ew[$cursn] before change_ */
+  parameter Bool cPRINT_CHANGE_PRE = false; 
+
+  /** Print ew[$cursn] after change_ */
+  parameter Bool cPRINT_CHANGE_POST = false; 
+}
+
+quark SPLATInstance {
+  virtual Void behave() {
+    if (evaluateRuleSets()) return;
+    if (failIfUnmatched()) {
+      Fail f; f.fail(0x51000005);
+    }
+  }
+  virtual Bool evaluateRuleSets() ;
+
+  /** By default we fail if unmatched */
+  virtual Bool failIfUnmatched() { return true; }
+}
+
+transient SPLATKeyState { // a Key is an ASCII used in LHS and/or RHS of a SPLAT rule
+
+  /// Provide the standard names for the standard utilities
+  EventWindow ew;
+  Random random;
+  DebugUtils du;
+
+  /// And one of our own
+  SPLATControl splatControl;
+
+  typedef Unsigned(16) Votes;
+  typedef EventWindow.SiteNum SN;
+  constant SN cUNSET_SN = SN.maxof;
+
+  Bool m_haveGiven; //< given_ has already been called since beginSiteEval
+  Bool m_givenValue;//< the value of the last given_ call
+  Bool m_haveVote; //< vote_ has already been called since beginSiteEval
+  Votes m_voteValue; //< the value of the last vote_ call
+  Bool m_haveChange; //< change_ has already been called since reset_
+
+  Void validSN(SN sn) { if (sn == cUNSET_SN) {Fail f; f.fail(0x5100024);} }
+
+  Votes max(Votes v1,Votes v2) { if (v1 >= v2) return v1; return v2; }
+  Votes min(Votes v1,Votes v2) { if (v1 <= v2) return v1; return v2; }
+
+  /// KeyExpr interpreters
+  Bool interpretGivenExpr(SPLATRuleSet & rs, SN cursn, Atom & curatom, String expr, ASCII ptr) {
+    Fail f;
+    Unsigned idx = ptr*4u;
+
+    if (idx >= expr.lengthof) f.fail(0x51000040);
+    ASCII leftPtr  = expr[idx+0u];
+    ASCII rightPtr = expr[idx+1u];
+    ASCII keyCode  = expr[idx+2u];
+    ASCII op       = expr[idx+3u];
+
+    //// Leaf
+    if (keyCode != 0) {
+      SPLATKeyState & ks = rs.getKeyState(keyCode);
+      Bool ret = ks.given_(rs, cursn, curatom);
+      if (splatControl.cPRINT_GIVEN) {
+        du.print("given_");
+        du.print(cursn);
+        du.print(ret);
+        du.print(ks);
+      }
+      return rs.updateGivenForNode(ptr,ret);
+    }
+
+    //// Operator
+    if (leftPtr == 0)  f.fail(0x51000053);
+    Bool lhs = interpretGivenExpr(rs, cursn, curatom, expr, leftPtr);
+
+    //// Unop ~
+    if (op == '~') return rs.updateGivenForNode(ptr,!lhs);
+
+    //// Short circuits [|&]
+    if (op == '|' && lhs) return rs.updateGivenForNode(ptr,true);
+    if (op == '&' && !lhs) return rs.updateGivenForNode(ptr,false);
+
+    //// Binop rhs [|&,]
+    if (rightPtr == 0)  f.fail(0x51000064);
+    return  rs.updateGivenForNode(ptr,interpretGivenExpr(rs, cursn, curatom, expr, rightPtr));
+  }
+
+  Votes interpretVoteExpr(SPLATRuleSet & rs, SN cursn, Atom & curatom, String expr, ASCII ptr) {
+
+    if (!rs.isGivenTrueForNode(ptr)) return 0;
+
+    Fail f;
+    Unsigned idx = ptr*4u;
+
+    if (idx >= expr.lengthof) f.fail(0x51000072);
+    ASCII leftPtr  = expr[idx+0u];
+    ASCII rightPtr = expr[idx+1u];
+    ASCII keyCode  = expr[idx+2u];
+    ASCII op       = expr[idx+3u];
+
+    //// Leaf
+    if (keyCode != 0) {
+      SPLATKeyState & ks = rs.getKeyState(keyCode);
+      Votes ret = ks.vote_(rs, cursn, curatom);
+      if (splatControl.cPRINT_VOTE) {
+        du.print("vote_");
+        du.print(cursn);
+        du.print(ret);
+        du.print(ks);
+      }
+      return ret;
+    }
+
+    //// Operator
+    if (leftPtr == 0)  f.fail(0x51000121);
+    Votes lhs = interpretVoteExpr(rs, cursn, curatom, expr, leftPtr);
+
+    //// Unop ~
+    if (op == '~') return lhs ? 0u : 1u;
+
+    //// Binop rhs [|&,]
+    if (rightPtr == 0)  f.fail(0x51000128);
+
+    if (op == ',') return interpretVoteExpr(rs, cursn, curatom, expr, rightPtr);
+    if (op == '|') return (lhs > 0) ? lhs : interpretVoteExpr(rs, cursn, curatom, expr, rightPtr);
+    if (op == '&') return (lhs == 0) ? lhs : interpretVoteExpr(rs, cursn, curatom, expr, rightPtr);
+
+    ///UNREACHABLE
+    f.fail(0x51000100);
+    return 1u;
+  }
+
+  Void interpretChangeExpr(SPLATRuleSet & rs, SN cursn, Atom & curatom, String expr, ASCII ptr) {
+    Fail f;
+    Unsigned idx = ptr*4u;
+
+    if (idx >= expr.lengthof) f.fail(0x51000104);
+    ASCII leftPtr  = expr[idx+0u];
+    ASCII rightPtr = expr[idx+1u];
+    ASCII keyCode  = expr[idx+2u];
+    ASCII op       = expr[idx+3u];
+
+    //// Leaf
+    if (keyCode != 0) {
+      SPLATKeyState & ks = rs.getKeyState(keyCode);
+      if (splatControl.cPRINT_CHANGE_PRE) {
+        du.print("prechange_");
+        du.print(cursn);
+        du.print(ew[cursn]);
+      }
+      ks.change_(rs, cursn, curatom);
+      if (splatControl.cPRINT_CHANGE_POST) {
+        du.print("postchange_");
+        du.print(cursn);
+        du.print(ew[cursn]);
+      }
+    }
+
+    //// Operator
+    if (leftPtr == 0)  f.fail(0x51000117);
+    interpretChangeExpr(rs, cursn, curatom, expr, leftPtr);
+
+    //// Unop ~
+    if (op == '~') return;
+
+    //// Binop rhs [|&,]
+    if (rightPtr == 0)  f.fail(0x51000124);
+    interpretChangeExpr(rs, cursn, curatom, expr, rightPtr);
+  }
+
+  /// SPLAT user accessors
+
+
+  // HANDLING $cursn AND $curatom via arguments
+  // // Accessed by $cursn (only defined in given, vote, and change)
+  // SN m_currentSN = cUNSET_SN;
+  // Void validCurSN() { validSN(m_currentSN); }
+  // SN getCurrentSN() { 
+  //   validCurSN();
+  //   return m_currentSN; 
+  // }
+
+  // Accessed by $keystate (DISGUSTING HACK? NEVER USE?) (defined in all states)
+  SPLATKeyState & getKeyState() { 
+    return self; 
+  }
+
+  // HANDLING $cursn AND $curatom via arguments
+  // // Accessed by $curatom (only defined in given, vote, and change)
+  // Atom m_currentAtom;
+  // Atom & getCurrentAtom() { 
+  //   validCurSN();
+  //   return m_currentAtom; 
+  // }
+
+  // Accessed by $picksn (defined in all codes, but only stable in
+  // check and change)
+  SN m_pickSN = cUNSET_SN;
+  Void validPickSN() { validSN(m_pickSN); }
+  SN getPickSN() { 
+    validPickSN();
+    return m_pickSN; 
+  }
+
+  // Accessed by $pickatom (defined in all codes, but only stable in
+  // check and change)
+  Atom m_pickAtom;
+  Atom & getPickAtom() { 
+    validPickSN();
+    return m_pickAtom; 
+  }
+
+  // Accessed by $winsn (defined in all codes, but only valid when
+  // $nvotes > 0, and only stable in check and change)
+  SN m_winnerSN = cUNSET_SN;
+  Void validWinSN() { self.validSN(self.m_winnerSN); }
+  SN getWinnerSN() { 
+    self.validWinSN();
+    return self.m_winnerSN; 
+  }
+
+  // Accessed by $winatom (defined in all codes, but only valid when
+  // $nvotes > 0, and only stable in check and change)
+  Atom m_winnerAtom;
+  Atom & getWinnerAtom() { 
+    self.validWinSN();
+    return m_winnerAtom; 
+  }
+
+  // Accessed by $nsites (defined in all codes, only stable in check
+  // and change)
+  SN m_numberSites = 0;
+  SN getNumberSites() { return m_numberSites; }
+
+  // Accessed by $nvotes (defined in all codes, only stable in check
+  // and change)
+  Unsigned m_numberVotes = 0;
+  Unsigned getNumberVotes() { return m_numberVotes; }
+
+  // Accessed by $key (defined and stable in all codes)
+  ASCII m_keyCode = 0;
+  ASCII getKeyCode() { return m_keyCode; }
+
+  /// Internal SPLATR accessors
+
+  /** Override the given() method to control whether to continue
+      processing the current rule based on this key code and the
+      current site.
+
+      Default given() behavior if not overridden: If the current site
+      is dead, return false to abandon current rule processing,
+      otherwise return true to include this site among the key code
+      picks and allow rule processing to continue
+
+      \returns false to abandon the current rule entirely now, or true
+      allow processing of this site and rule to continue
+   */
+  virtual Bool given(SPLATRuleSet & rs, SN cursn, Atom & curatom) {
+    return ew.isLive(cursn);
+  }
+
+  /** Override the vote() method to determine whether and how strongly
+      this site should be considered as the 'selection' for this key
+      code.  If an LHS contains multiple sites with the same key code
+      (modulo special case rules), the selection among them will be
+      random based on number of votes each received.
+
+      Default vote() behavior: Vote 1 for every appearance of this key
+      code.
+
+      \returns 0 to exclude absolutely this site from possible
+      selection; greater than zero to give that many votes for this
+      site among the selection candidates for this key code.  Note it
+      is not possible to abandon the current rule from a vote()
+      method.
+   */
+  virtual Votes vote(SPLATRuleSet & rs, SN cursn, Atom & curatom) { return 1u; }
+
+  /** Override the check() method to determine whether to abandon rule
+      processing after all relevant LHS sites have been visited.
+      (Note the check method is only called on key codes that _do_
+      appear in the LHS.  It is not called for key codes that appear
+      _only_ in the RHS.)
+
+      Default check() behavior: return true iff any votes were cast
+      for this key code (i.e., $nvotes > 0)
+
+      \return true if processing this rule should continue; false if
+      processing this rule should now be abandoned
+   */
+  virtual Bool check(SPLATRuleSet & rs) {
+    return getNumberVotes() > 0u;
+  }
+
+  /** Override the change() method to alter the RHS behavior of this
+      key code.
+
+      Default change() behavior: Make site be a copy of the winner of
+      the votes for this key code (i.e., ew[$cursn] = $winatom).
+      (Note that $winatom might be an illegal atom, if check() is
+      overridden -- by default, the vote count is not rechecked in
+      change()).  Note it is not possible to abandon the current rule
+      from a change() method.
+
+      \returns Void
+   */
+  virtual Void change(SPLATRuleSet & rs, SN cursn, Atom& curatom) {
+    curatom = self.m_winnerAtom;
+  }
+
+  Bool given_(SPLATRuleSet & rs, SN cursn, Atom & curatom) {
+    if (m_haveGiven) return m_givenValue;
+    m_haveGiven = true;
+    m_givenValue = given(rs, cursn, curatom);
+
+    if (!m_givenValue) return false;
+
+    Random r;
+    if (r.oneIn(++m_numberSites)) {
+      m_pickSN = cursn;          // for now..
+      m_pickAtom = curatom;      // in the clubhouse..  
+    }
+
+    return true;
+  }
+
+  Votes vote_(SPLATRuleSet & rs, SN cursn, Atom & curatom) {
+    if (m_haveVote) return m_voteValue;
+
+    if (m_haveGiven && m_givenValue) { // If not given, never call vote() 
+      m_voteValue = vote(rs, cursn, curatom);
+      m_haveVote = true;
+    }
+
+    if (m_voteValue == 0u) return 0u;
+
+    m_numberVotes += (Unsigned) m_voteValue;
+    Random r;
+    if (r.oddsOf(m_voteValue, m_numberVotes)) {
+      m_winnerSN = cursn;          // for now..
+      m_winnerAtom = curatom;      // in the clubhouse..  
+    }
+
+    return m_voteValue;
+  }
+
+  Bool check_(SPLATRuleSet & rs) {
+    return check(rs);
+  }
+
+  Void change_(SPLATRuleSet & rs, SN cursn, Atom & curatom) {
+    //We can't make change dependent on havegiven, because then we
+    //can't introduce new stuff in the RHS.
+    if (m_haveChange) return; // If already changed, done
+    m_haveChange = true;
+    change(rs,cursn,curatom);
+  }
+
+  Bool isDefined() {
+    return m_keyCode != 0;
+  }
+
+  Void undefine() {
+    m_keyCode = 0;
+  }
+
+  Void define(ASCII code) {
+    m_keyCode = code;
+    reset_();
+  }
+
+  virtual Void beginSiteEval() {
+    m_haveGiven = false;   // Have not called given_ on this site
+    m_givenValue = false;  // Value of given_ call on this site, if m_haveGiven, else default no
+    m_haveVote = false;    // Have not called vote_ on this site
+    m_voteValue = 0u;      // Value of vote_ call on this site, if m_haveVote, else default 0u
+    m_haveChange = false;  // Have not called change_ on this site
+  }
+
+  virtual Void reset_() {
+    m_pickSN = cUNSET_SN;
+    m_pickAtom = Empty.instanceof;
+    m_winnerSN = cUNSET_SN;
+    m_winnerAtom = Empty.instanceof;
+    m_numberSites = 0;
+    m_numberVotes = 0;
+  }
+
+}
+
+/** '_' abandons the rule unless site is live and empty */
+transient SPLATKeyStateEmpty : SPLATKeyState { 
+  virtual Bool given(SPLATRuleSet & rs, SN cursn, Atom & curatom) { return ew.isLive(cursn) && curatom is Empty; } 
+}
+
+/** '?' allows any non-empty site and doesn't change anything */
+transient SPLATKeyStateOccupied : SPLATKeyState { 
+  virtual Bool given(SPLATRuleSet & rs, SN cursn, Atom & curatom) { return !(curatom is Empty); } 
+  virtual Votes vote(SPLATRuleSet & rs, SN cursn, Atom & curatom) { return 1; } 
+  virtual Void change(SPLATRuleSet & rs, SN cursn, Atom & curatom) { return; } 
+}
+
+/** '.' allows anything in a live or non-live site, and doesn't change anything */
+transient SPLATKeyStateAny : SPLATKeyState { 
+  virtual Bool given(SPLATRuleSet & rs, SN cursn, Atom & curatom) { return true; } 
+  virtual Votes vote(SPLATRuleSet & rs, SN cursn, Atom & curatom) { return 1; } 
+  virtual Void change(SPLATRuleSet & rs, SN cursn, Atom & curatom) { return; } 
+}
+
+/** invalid has no key code and fails at everything */
+transient SPLATKeyStateInvalid : SPLATKeyState { 
+  Void fail() { Fail f; f.fail(0x51000360); }
+  virtual Bool given(SPLATRuleSet & rs, SN cursn, Atom & curatom) { fail(); return super.given(rs,cursn,curatom); } 
+  virtual Votes vote(SPLATRuleSet & rs, SN cursn, Atom & curatom) { fail(); return super.vote(rs,cursn,curatom); } 
+  virtual Bool check(SPLATRuleSet & rs) { fail(); return super.check(rs); } 
+  virtual Void change(SPLATRuleSet & rs, SN cursn, Atom & curatom) { fail(); return super.change(rs,cursn,curatom); } 
+}
+
+/** '@' allows only a centered singleton */
+transient SPLATKeyStateSelf : SPLATKeyState { 
+  virtual Bool given(SPLATRuleSet & rs, SN cursn, Atom & curatom) {
+    if (getNumberSites() > 1 || cursn != 0) {
+      Fail f; f.fail(0x51000292);  // @ must only be in center of LHS, doofus
+    }
+    return true;
+  } 
+}
+
+/**
+   A SPLATRuleSet is a group of rules that share a set of
+   KeyState definitions
+ */
+transient SPLATRuleSet {
+  // Predefined key states
+  SPLATKeyStateSelf m_keyStateSelf;         // For code @
+  SPLATKeyStateEmpty m_keyStateEmpty;       // For code _
+  SPLATKeyStateAny m_keyStateAny;           // For code .
+  SPLATKeyStateOccupied m_keyStateOccupied; // For code ?
+  SPLATKeyStateInvalid m_keyStateInvalid;   // For unused codes
+
+  /** Default getKeyState routine.  If a set of rules involves any
+   * custom key code, the generated subclass of SPLATRuleSet must
+   * override this method return appropriate subclasses of
+   * SPLATKeyState as desired.  Here, by default, the special key
+   * codes are handled and everything else gets an invalid KeyState,
+   * that will fail if used.  In general it is recommended that
+   * subclasses end method overrides with
+   *
+   * 'return super.getKeyState(key)'.
+   */
+
+  virtual SPLATKeyState & getKeyState(ASCII key) {
+    if (key == m_keyStateSelf.getKeyCode()) return m_keyStateSelf;
+    if (key == m_keyStateEmpty.getKeyCode()) return m_keyStateEmpty;
+    if (key == m_keyStateAny.getKeyCode()) return m_keyStateAny;
+    if (key == m_keyStateOccupied.getKeyCode()) return m_keyStateOccupied;
+
+    return m_keyStateInvalid;
+  }
+
+  /** The generated subclass of SPLATRuleSet must define
+   * evaluateRules */
+  virtual Bool evaluateRules() ;
+
+  virtual Void reset() {
+    m_keyStateSelf.define('@');
+    m_keyStateEmpty.define('_');
+    m_keyStateAny.define('.');
+    m_keyStateOccupied.define('?');
+  }
+
+  virtual Void beginSiteEval() {
+    clearAllGivensForNodes();
+    m_keyStateSelf.beginSiteEval();
+    m_keyStateEmpty.beginSiteEval();
+    m_keyStateAny.beginSiteEval();
+    m_keyStateOccupied.beginSiteEval();
+  }
+
+  /* Support for marking keyexpr nodes as known given true */
+  typedef Bits(64) BitMap64;
+  BitMap64 m_givenTrueForNode;
+
+  Void clearAllGivensForNodes() { m_givenTrueForNode = 0; }
+  Bool isGivenTrueForNode(Unsigned i) { return ((m_givenTrueForNode>>i)&1u)!=0u; }
+  Bool updateGivenForNode(Unsigned i, Bool val) { 
+    if (val) m_givenTrueForNode |= ((BitMap64) 1u)<<i; 
+    return isGivenTrueForNode(i);
+  }
+}
+
+/**
+   A generic routine to evaluate a single rule within a ruleset
+ */
+transient SPLATRuleDriver {
+  typedef EventWindow.SiteNum SN;
+  EventWindow ew;
+  constant ASCII cEND_OF_LHS = ASCII.maxof;
+  constant ASCII cEND_OF_RHS = cEND_OF_LHS-1;
+
+  Bool evaluateRule(SPLATRuleSet & rs, String rule) {
+    Bool(1) used[256];
+    ASCII usedCodes[41];
+    Unsigned codesUsed = 0;
+    Unsigned rsi = 0; // ruleStringIndex
+
+    rs.reset();
+
+    // GIVEN and VOTE at all specified sites
+    while (true) {
+      ASCII a1 = rule[rsi++];
+      if (a1 == cEND_OF_LHS) break;
+      ASCII a2 = rule[rsi++];
+      SN sn = (SN) a1;
+      Atom & atom = ew[sn];
+      ASCII keyCode = a2;
+
+      rs.beginSiteEval();
+      SPLATKeyState & ks = rs.getKeyState(keyCode);
+      if (!ks.given_(rs,sn,atom)) return false;
+
+      if (!used[keyCode]) {
+        used[keyCode] = true;
+        usedCodes[codesUsed] = keyCode;
+        ++codesUsed;
+      }
+
+      ks.vote_(rs,sn,atom); // Returns total votes but we don't care?
+    }
+
+    // CHECK once per used keycode
+    for (Unsigned i = 0; i < codesUsed; ++i) {
+      ASCII keyCode = usedCodes[i];
+      SPLATKeyState & ks = rs.getKeyState(keyCode);
+      if (!ks.check_(rs)) return false;
+    }
+
+    // CHANGE at all specified sites
+    while (true) {
+      ASCII a1 = rule[rsi++];
+      if (a1 == cEND_OF_RHS) break;
+      ASCII a2 = rule[rsi++];
+      SN sn = (SN) a1;
+      Atom & atom = ew[sn];
+      ASCII keyCode = a2;
+      
+      rs.beginSiteEval();
+      SPLATKeyState & ks = rs.getKeyState(keyCode);
+      ks.change_(rs,sn,atom);
+    }
+
+    return true;
+  }
+}
