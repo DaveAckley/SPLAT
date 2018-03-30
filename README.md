@@ -1,2 +1,2 @@
 # SPLAT
-Repository for programming language SPLAT: Spatial Programming Language, Ascii Text
+Repository for programming language SPLAT: **S**patial **P**rogramming **L**anguage, **A**SCII **T**ext
