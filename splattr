@@ -88,6 +88,7 @@ sub main {
     my @splatsDied;
     my @ulamsGenned;
     my @ulamsSourced;
+    my @mfsFiles;
     my @splatSources;
     my %ulamGenDirs;
     my $mfzfile = undef;
@@ -115,6 +116,10 @@ sub main {
             push @ulamsSourced, $arg;
             next;
         }
+        if ($arg =~ /.*[.]mfs$/) {  # Pass .mfs files through
+            push @mfsFiles, $arg;
+            next;
+        }
 
         SPLATtr::usageDie("%s","Not SPLAT file '$arg'")
             unless $arg =~ /.*[.]splat$/;
@@ -134,7 +139,7 @@ sub main {
     }
     $mfzfile = "a.mfz" unless defined $mfzfile;
         
-    my $ret = buildULAMFiles(\%ulamGenDirs,$mfzfile,@ulamsGenned,@ulamsSourced,@splatSources);
+    my $ret = buildULAMFiles(\%ulamGenDirs,$mfzfile,@ulamsGenned,@ulamsSourced,@mfsFiles,@splatSources);
     if (!$ret) {
         print STDERR "ULAM build failed\n";
         exit 4;
