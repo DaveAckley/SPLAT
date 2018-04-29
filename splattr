@@ -74,10 +74,10 @@ sub buildULAMFiles {
         $includes = "-o $includes";
     }
     my $cmd = "$ulamPath $includes @ulamsEtc";
-    print STDERR "RN:$cmd\n";
+    print STDERR "RN:($cmd)\n";
     my $ret = `$cmd`;
     if ($ret ne "") {
-        print STDERR "$ret";
+        print STDERR "RET($ret)";
         return 1;
     }
     return 1;
