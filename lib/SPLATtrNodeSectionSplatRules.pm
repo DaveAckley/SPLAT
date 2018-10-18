@@ -12,6 +12,7 @@ package SPLATtrNodeSectionSplatRules {
             );
         SPLATUrSelf::crash("Missing section level") 
             unless defined $self->{sectionLevel};
+#        print STDERR  "SPLATtrNodeSectionSplatRules ".$self->{sectionLevel}."\n";
         SPLATUrSelf::crash("Missing ruleOrder") 
             unless defined $self->{ruleOrder};
         SPLATUrSelf::crash("Bad section level $params{sectionLevel}") 

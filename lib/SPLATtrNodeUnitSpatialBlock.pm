@@ -32,6 +32,12 @@ package SPLATtrNodeUnitSpatialBlock {
         $self->findPatternsInSpatialBlock($self,@parents);
         if (scalar(@{$self->{patterns}}) > 0) {
             my $sclass = $self->getClassFromParents("SPLATtrNodeSectionSplatClass",@parents);
+            my $rsect = $self->getClassFromParents("SPLATtrNodeSectionSplatRules",@parents);
+            if (!defined($rsect)) {
+                $self->{s}->printfError($self->{sourceLine},"Non-empty spatial block in top-level section (Missing '== Rules'?)");
+                return undef;
+            }
+
             if (!defined($sclass)) {
                 $self->{s}->printfError($self->{sourceLine},"Non-empty spatial block outside of splat class");
                 return undef;
