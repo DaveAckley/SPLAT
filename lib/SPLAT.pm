@@ -19,6 +19,14 @@ our $VERSION = '0.01';
 
 =head1 SYNOPSIS
 
+USE SPLATTR FROM THE COMMAND LINE
+
+    $ ../splattr Foo.splat
+    $ mfzrun a.mfz
+
+(and watch it die unless the installed mfm/mfzrun is way new enough
+for all this.)
+
 Under development documention for SPLAT as a perl module.  But it's
 really not meant to be a perl module, it's meant to be a, um,
 compiler.  So it's unclear how developed this doc here will ever
