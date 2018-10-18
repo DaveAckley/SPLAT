@@ -1,9 +1,34 @@
 #!/usr/bin/perl -w         # -*- perl -*-
 use File::Basename;
-use lib dirname(__FILE__)."/lib";
+use File::Spec;
+use lib dirname(__FILE__)."/blib/lib";
 use SPLATtr;
 
 my $scriptPath = dirname(__FILE__);
+
+sub isCulamHere {
+    my $path = shift;
+    my $ulam = "$path/culam";
+    return -x $ulam;
+}
+
+sub findUlamDir {
+    # Try to find a neighborly ulam first since installed packages
+    # would likely be older
+    my $absPath = File::Spec->rel2abs( $scriptPath ) ;
+    while ($absPath ne "") {
+        my $maybedir = "$absPath/ULAM";
+        if (isCulamHere("$maybedir/bin")) {
+            return $maybedir;
+        }
+        $absPath = dirname($absPath);
+    }
+    die("Ulam not found: Need ulam repo as a sibling or cousin to $scriptPath");
+}
+
+my $ulamDir = findUlamDir();
+
+my $DEBUG;
 
 sub usageDie {
     my ($fmt, @args) = @_;
@@ -55,11 +80,6 @@ sub compileOneSPLATFile {
                               $errc,$errs);
     return undef;
 }
-
-my $ulamDir = "/home/ackley/papers/MF/asrepo/RT13/code/ULAM-fork/ULAM";
-#my $ulamDir = "/usr";
-
-my $DEBUG = 1;
 
 sub buildULAMFiles {
     my ($dirref,@ulamsEtc) = @_;
