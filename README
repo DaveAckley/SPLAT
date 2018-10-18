@@ -1,0 +1,57 @@
+SPLAT PERL MODULE
+VERSION 0.01
+
+This README (as opposed to README.md) is for CPAN so that people
+browsing the archive can use it to get an idea of what the SPLAT
+module is about. 
+
+STANDARD PERL MODULE INSTRUCTIONS FOLLOW:
+
+INSTALLATION
+
+To install this module, run the following commands:
+
+	perl Makefile.PL
+	make
+	make test
+	make install
+
+SUPPORT AND DOCUMENTATION
+
+After installing, you can find documentation for this module with the
+perldoc command.
+
+    perldoc SPLAT
+
+You can also look for information at:
+
+    RT, CPAN's request tracker (report bugs here)
+        http://rt.cpan.org/NoAuth/Bugs.html?Dist=SPLAT
+
+    AnnoCPAN, Annotated CPAN documentation
+        http://annocpan.org/dist/SPLAT
+
+    CPAN Ratings
+        http://cpanratings.perl.org/d/SPLAT
+
+    Search CPAN
+        http://search.cpan.org/dist/SPLAT/
+
+
+LICENSE AND COPYRIGHT
+
+Copyright (C) 2018 Dave Ackley
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see L<http://www.gnu.org/licenses/>.
+
