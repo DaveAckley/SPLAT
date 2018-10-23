@@ -1,0 +1,10 @@
+= element FB.  Fork bomb
+\color #f00
+\symmetries all
+
+== Rules
+
+  @_ -> @@
+
+  @ -> @
+  

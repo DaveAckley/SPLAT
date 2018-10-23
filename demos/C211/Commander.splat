@@ -1,0 +1,72 @@
+## A QCommander injects a new command
+# into the first Content it sees, and
+# then erases itself.
+= quark QCommander
+
+== Data members
+u typedef EventWindow.Dir Dir;
+u typedef Content.Velocity Velocity;
+
+== Rules
+given c isa Content
+change @ isa QCommander {
+. typedef QCommander.Dir Dir;
+. Dir dir = $self.getDir();  // Find chosen direction
+.
+. typedef QCommander.Velocity Velocity;
+. Velocity vel = $self.getVelocity(); // And speed
+.
+. Bool split = $self.getSplit(); // And whether to split
+.
+. Content & c = (Content&) ew[$c.$winsn];
+. c.m_cmdPrio.increment();             // Advance its command priority
+. c.setDir(dir,vel,c.m_cmdPrio.get(),split); // and give it its new orders
+. ew[0] = Empty.instanceof;  // and die
+.}
+
+ @c -> @.  # Deliver command and die
+
+ @ -> .    # Or else hold
+
+== Methods
+u virtual Bool getSplit() {
+.   return false;  // Don't split
+. }
+
+u virtual Dir getDir() {
+.   Random random;
+.   return (Dir) random.create(Dir.maxof); // Random dir by default
+. }
+
+u virtual Velocity getVelocity() {
+.   Random random;
+.   return (Velocity) random.between(1,Velocity.maxof); // Random (non-zero) by default
+. }
+
+= element Commander isa QCommander
+\symbol CM
+\color #f0f
+\symmetries all
+
+= element StopCommand isa QCommander
+\symbol SC
+\color #f00
+\symmetries all
+
+== Methods
+u virtual Dir getDir() { return 0u; }
+u virtual Velocity getVelocity() { return (Velocity) 0u; }
+
+= element SplitCommand isa QCommander
+\symbol SP
+\color #bbe
+\symmetries all
+
+== Methods
+u virtual Dir getDir() {
+.   Random random;
+.   // The QMembrane fission rule prefers orthogonal directions
+.   return (Dir) (random.create(Dir.maxof/2u)*2u); // So pick from 0,2,4,6
+. }
+u virtual Velocity getVelocity() { return (Velocity) 7u; }
+u virtual Bool getSplit() { return true; }  // Go for it!

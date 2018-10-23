@@ -1,0 +1,5 @@
+= element OuterMembrane isa QMembrane
+\symbol OM
+\color #456789
+\symmetries all
+

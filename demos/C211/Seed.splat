@@ -1,0 +1,13 @@
+= element Seed
+\color #c0c
+
+== Rules: Germination
+change o isa OuterMembrane
+change i isa InnerMembrane
+change c isa Content
+   _____           ooooo
+   _____           oiiio
+   __@__    ->     oicio  
+   _____           oiiio
+   _____           ooooo
+

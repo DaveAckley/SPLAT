@@ -1,0 +1,5 @@
+= element InnerMembrane isa QMembrane
+\symbol IM
+\color #6789ab
+\symmetries all
+

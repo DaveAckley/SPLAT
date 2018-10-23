@@ -1,0 +1,352 @@
+= element Content isa QContent
+\color #2d3
+# Note: Not \symmetries all! C2D.dot() messed up on flips!
+\symmetries rotations
+== Data members
+u /** Enable run and tumble */
+. parameter Bool cRNT = true;
+u /** Max go duration \range 1..15 */
+. parameter Unsigned cMAXGO = 14u;
+u /** Max stop duration \range 1..15 */
+. parameter Unsigned cMAXSTOP = 12u;
+u /** Inverse max velocity \range 10..100 */
+. parameter Unsigned cMAXVODDS = 24u;
+u /** Split odds \range 0..50 */
+. parameter Unsigned cSPLIT = 0;
+
+u constant Unsigned cSPEEDBOOST = 5u;
+u constant Unsigned cVELBASE = 3u;
+u typedef EventWindow.SiteNum SiteNum;
+u typedef SPLATKeyState.Votes Votes;
+u constant Unsigned cTAG_BITS = 16;   // 65K possible types of Content
+u typedef Unsigned(16) Tag;
+
+u constant Int cGENERATIONS = 6;       // Surge to 64 content (pre-repro)
+u typedef Unary(cGENERATIONS) Generations;
+
+u constant Unsigned cTIMER_BITS = 4u;   // Exponential timer range for motion
+u constant Unsigned cTIMER_TRIGGER = cTIMER_BITS.maxof;   // Anything up to Unsigned(cTIMER_BITS).maxof
+u typedef XTimer(cTIMER_BITS,cTIMER_TRIGGER,1u) MotionTimer;
+
+u constant Unsigned cCMD_BITS = 6u;     // Allow ~32 cmds in flight before ambiguity
+u typedef UMod(cCMD_BITS) CommandSpinner;
+
+u Generations m_gen;
+u Tag m_tag;
+u MotionTimer m_moveTimer;
+
+u typedef EventWindow.Dir Dir;
+u Dir m_moveDir;               // Direction to prefer if m_moveTimer active
+
+u typedef Unsigned(3) Velocity;
+u Velocity m_moveVelocity;     // How hard to prefer moveDir if moveTimer active
+
+u CommandSpinner m_cmdPrio;
+
+u Bool m_splitting;           // True if accepted a move command with split set, and have not yet stopped
+u Bool m_haveSplit;           // True if have done my own splitting
+u Bool m_offspring;           // True if I am a split result
+
+u Unary(4) m_lastMoveReason; // 0 unrecorded, 1 membrane wait, 2 dir empty, 3 dir other, 4 mob rule
+
+== Prerules (Content war)
+given x isa Content
+check @ {
+. Content & xwin = (Content&) ($x.$winatom);
+. Content & at = (Content&) ($winatom);
+. typedef Content.Tag Tag;
+. Unsigned diff = (Unsigned) (xwin.m_tag ^ at.m_tag);
+. return (diff%3u) == 2u;
+.}
+
+  @x -> @_      # Fight if xor tags is phase 2 % 3
+
+== Prerules (Command propagation)
+
+# This is probably a bad idea, but this vote rule side-effects the
+# voters on the fly.  It's still isotropic because we have no givens
+# that can stop the scan early, so we'll visit everybody no matter
+# what.  The rule overall will match (and thus end the event) if
+# anybody does in fact accept command propagation.
+vote o isa Content {
+.  Content & ctr = (Content&) ew[0];
+.  if ($self.maybeTakeDir(ctr)) return 1u;
+.  return 0u;
+.}
+
+ ooo    ...
+ o@o -> ...
+ ooo    ...
+
+== Prerules (Mob growth)
+# Skip this section if no growth needed
+given @ isa Content { 
+.  $self.m_lastMoveReason = 0u;
+.  return $self.m_gen < $self.m_gen.maxof; 
+.}
+
+vote e : $curatom is Empty
+
+check @ {
+. Content & us = (Content &) $winatom;
+. typedef Content.Tag Tag;
+. if (us.m_gen == 0) { us.m_tag = (Tag) random.bits(Tag.sizeof); }
+. if (us.m_gen < us.m_gen.maxof) { us.m_gen++; return true; }
+. return false;
+.}
+
+# Write updated $winatom back to us and to winning empty
+change @ { ew[$cursn] = ew[$e.$winsn] = $winatom; }
+
+ eee    ...
+ e@e -> .@.     # Eight-way empty search speeds growth
+ eee    ...
+
+== Prerules (Special content motion rules: Split)
+
+given @ isa Content  {
+.   return $self.m_splitting &&
+.          !$self.m_offspring &&
+.          !$self.m_haveSplit;
+. }
+change C {
+.  Content & ctr = (Content &) ew[0];
+.  Content copy = ctr;
+.  copy.m_splitting = true;
+.  copy.m_haveSplit = true;
+.  copy.m_offspring = true;
+.  copy.m_moveDir = (EventWindow.Dir) ((((Unsigned) ctr.m_moveDir) + 4u)%8u);
+.  ew[$cursn] = copy;
+.  ctr.m_haveSplit = true;
+. }
+
+  _@ -> C.
+
+== Prerules (Special content motion rules: Run)
+
+given @ isa Content  {
+.   return $self.cRNT &&
+.          $self.m_moveVelocity == 0u &&
+.          $self.m_moveTimer.count() >= $self.cMAXSTOP;
+. }
+change C { 
+.  Content & ctr = (Content &) ew[0];
+.  Random random;
+.  if (ctr.cSPLIT > 0u && !ctr.m_splitting && random.oneIn(ctr.cSPLIT))
+.    ew[$cursn] = SplitCommand.instanceof;
+.  else
+.    ew[$cursn] = Commander.instanceof;
+. }
+
+  _@ -> C.
+
+== Prerules (Special content motion rules: Tumble)
+
+given @ isa Content  {
+.   return $self.cRNT &&
+.          $self.m_moveVelocity > 0u &&
+.          $self.m_moveTimer.count() >= $self.cMAXGO;
+. }
+change S { 
+.    ew[$cursn] = StopCommand.instanceof;
+. }
+
+  _@ -> S.
+
+
+== Prerules (Special content motion rules: Leading edge)
+
+given @ isa Content
+
+# If we are moving and adjacent to any InnerMembrane in the heading
+# direction, just hang there if we're splitting, or maybe even if
+# we're not, with velocity-increasing odds..
+
+vote i isa InnerMembrane {
+.  Content & ctr = (Content &) ew[0];
+.  Votes vel = ctr.m_moveVelocity;
+.  if (ctr.voteInMotionDir($cursn) > 0u && ctr.speedOdds()) {
+.     ctr.m_lastMoveReason = 1u;
+.     return 1u;
+.  }
+.  return 0u;
+. }
+
+  iii      ...
+  i@i  ->  ...
+  iii      ...
+
+== Prerules (Mob rules)
+
+# [From 201802240937-notes.txt]
+# (1) Generalize 'x' matching to detect direction-facing empties and all
+#     empties separately.  Also, detect direction-facing other Content
+#     and all other Content separately.  If we are not moving, do not
+#     detect direction-facing empties or Content.
+
+# Scan for Content (c) and Empty (e), and also note any
+# move-direction-facing Content (C) and Empty (E).
+# Also note, separately, any move-direction-facing Content (O) that is
+# of a different generation than us.
+
+given @ isa Content 
+
+given e isa Empty
+given c isa Content
+
+given E isa Empty
+vote  E {
+.   Content & ctr = (Content &) ew[0];
+.   return ctr.voteInMotionDir($cursn);
+. }
+
+given C isa Content
+vote  C isa Content {
+.   Content & ctr = (Content &) ew[0];
+.   return ctr.voteInMotionDir($cursn);
+. }
+
+given O isa Content
+vote  O isa Content {
+.   Content & ctr = (Content &) ew[0];
+.   if (ctr.m_offspring == $self.m_offspring) return 0u;
+.   return ctr.voteInMotionDir($cursn);
+. }
+
+let x = e&E|c&C&O|.
+
+   x        .
+  xxx      ...
+ xx@xx -> .....
+  xxx      ...
+   x        .
+
+# Do mobile mob rule at check time:
+# (0) If we have a cross-generation move-direction-facing Content, 
+#      swap with that
+#
+# [From 201802240937-notes.txt]
+# (2) If we have a direction-facing empty, then with probability
+#     oddsOf(velocity,MAXVODDS), swap to the empty.
+#
+# (3) Otherwise, if we have direction-facing other Content, then with
+#     probability oddsOf(velocity,MAXVODDS), swap with that other.
+#     (This is particularly relevant during cell division when we can
+#     have Content going in multiple directions..)
+#
+# (4) Otherwise, (Mob Rule): If have any empty, and any other Content,
+#     and that empty is closer to that other than we are, swap to that
+#     empty.
+#
+# And otherwise the rule doesn't match.
+#
+check @ {
+.  typedef EventWindow.SiteNum SiteNum;
+.  Content & ctr = (Content &) ew[0];
+.  Unsigned vel = ctr.m_moveVelocity;
+.  // Part (0)
+.  if (($O.$nvotes) > 0u) {
+.    ctr.m_lastMoveReason = 3u;
+.    ew.swap(0u, ($O.$picksn));
+.    return true;
+.  }
+.  // Part (2)
+.  if (($E.$nvotes) > 0u && ctr.speedOdds()) {
+.    ctr.m_lastMoveReason = 2u;
+.    ew.swap(0u, ($E.$picksn));
+.    return true;
+.  }
+.  // Part (3)
+.  if (($C.$nvotes) > 0u && ctr.speedOdds()) {
+.    ctr.m_lastMoveReason = 3u;
+.    ew.swap(0u, ($C.$picksn));
+.    return true;
+.  }
+.  // Part (4)
+.  if (($e.$nvotes) > 0u && ($c.$nvotes) > 0u) {
+.    C2D spos(0,0);
+.    C2D epos = ew.getCoord($e.$picksn);
+.    C2D cpos = ew.getCoord($c.$picksn);
+.    Unsigned celen = cpos.manhattanDistance(epos);
+.    Unsigned cslen = cpos.manhattanDistance(spos);
+.    if (celen <= cslen) {
+.      ctr.m_lastMoveReason = 4u;
+.      ew.swap(0,($e.$picksn));
+.      return true;
+.    }
+.  }
+.  return false;    // Otherwise we got nothing
+. }
+
+== Postrules
+
+  @ -> .     # Last ditch hold
+
+== Methods
+# Color depends on tag, but loses green with age, but brightens when moving
+getColor {
+. if (m_splitting) {
+.   if (m_haveSplit) return m_offspring ? cu.color(0x33,0xbb,0x33) : cu.color(0xbb,0x33,0x33) ;
+.   /* else */       return m_offspring ? cu.color(0x11,0xee,0x11) : cu.color(0xee,0x11,0x11) ;
+. }
+. ARGB ret = cu.color((ColorUtils.Byte) (100u + (m_tag/1u)%256u*10u),
+.                    (ColorUtils.Byte) (0xffu-m_gen*8u),
+.                    (ColorUtils.Byte) (100u + (m_tag/256u)%256u*10u));
+. if (m_lastMoveReason >= 1u && m_lastMoveReason <= 3u) ret = cu.brighter(ret);
+. else if (m_lastMoveReason == 4u) ret = cu.dimmer(ret);
+. return ret;
+.}
+
+u Bool speedOdds() {
+.  Random random;
+.  return random.oddsOf(m_moveVelocity
+.                      +cVELBASE
+.                      +(m_splitting?cSPEEDBOOST:0u), 
+.                      cMAXVODDS);
+.}
+
+u Void setDir(Dir dir, Velocity vel, Unsigned prio, Bool split) {
+.   m_moveDir = dir;
+.   m_moveVelocity = vel;
+.   m_cmdPrio.set((CommandSpinner.Value) prio);
+.   m_moveTimer.reset();
+.   m_splitting = split;
+.   m_haveSplit = false;
+. }
+.
+
+u Void clearVelocity() {
+.   m_moveDir = 0u;
+.   m_moveVelocity = 0u;
+.   m_splitting = false;
+.   m_haveSplit = false;
+.   m_offspring = false;
+.   m_moveTimer.reset();
+. }
+.
+
+u Bool maybeTakeDir(Content & other) {
+.   if (other.m_cmdPrio.isGreater(self.m_cmdPrio) && !other.m_offspring) {
+.    setDir(other.m_moveDir, other.m_moveVelocity, other.m_cmdPrio.get(), other.m_splitting);
+.    return true;
+.   } else return false;
+. }
+.
+
+u Votes voteInMotionDir(SiteNum destsn) {
+.   EventWindow ew;
+.   Content & ctr = (Content &) ew[0];
+.   Unsigned vel = ctr.m_moveVelocity;
+.   if (vel == 0u) return 0u;
+.   // Normalize out the \symmetries rotations :
+.   // (1) C2D.neighbor(sn) is independent of ew.sym,
+.   //     so we can take it as 00L;
+.   // (2) ew.getCoord(sn) passes sn through ew.sym
+.   //     and then returns the corresponding 00L coord
+.   // So we can just dot them directly..
+.   C2D origin;
+.   C2D ngbDir = origin.neighbor(ctr.m_moveDir);
+.   C2D destDir = ew.getCoord(destsn);
+.   Int angle = destDir.dot(ngbDir);
+.   return (angle < 0) ? 0u : 1u;
+. }

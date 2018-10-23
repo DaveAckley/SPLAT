@@ -1,0 +1,27 @@
+#####
+#
+= quark QContent. The parent class of membrane-enclosed content
+# Note: Not \symmetries all! C2D.dot() messed up on flips!
+\symmetries rotations
+
+== Rule:  Background evaporation
+given n : !(ew[$cursn] is QContent) && !(ew[$cursn] is InnerMembrane)
+
+check @ : random.oneIn(100)    // 1% death rate when isolated
+
+   nnnnn         .....
+   nnnnn         .....
+   nn@nn    ->   .._..      # Need company within ESL 8 to avoid depression
+   nnnnn         .....
+   nnnnn         .....
+
+== Rules: Basic operations
+
+given x : ew[$cursn] is QContent || ew[$cursn] is Empty
+
+ @x -> x@     # Content diffuses through self and empty
+
+given i : ew[$cursn] is InnerMembrane
+
+ i@ -> ..     # Hanging out by membrane is okay too
+
