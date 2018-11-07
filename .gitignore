@@ -52,3 +52,4 @@ SPLAT-*
 SPLAT-*.tar.gz
 
 .gen/
+.splatgen/
