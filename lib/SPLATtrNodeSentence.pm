@@ -269,7 +269,7 @@ package SPLATtrNodeSentence {
 
         ## Get optional ISA type
         my $OPTISA = undef;
-        if ($text =~ /^isa\s+([A-Z][A-Za-z_]*)\s*([^\s].*)?$/s) {
+        if ($text =~ /^isa\s+([A-Z][A-Za-z0-9_]*)\s*([^\s].*)?$/s) {
             ($OPTISA,$text) = ($1,$2);
 
             if (!defined($text) || $text =~ m!^//.*$!) { # isa was all of it, or with just a comment
