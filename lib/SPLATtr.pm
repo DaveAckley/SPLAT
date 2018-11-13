@@ -22,13 +22,20 @@ require SPLATtrNodeSententialGroup;
 require SPLATtrNodeUnit;
 require SPLATtrNodeUnitSpatialBlock;
 
+### VERSION HISTORY
+#
+# 1.002 2018/11/07 First released version
+#
+# 1.001 Primordial soup
+#
+###
 
 # SPLAT translator
 package SPLATtr {
     use parent "SPLATUrSelf";
     our @ISA;
 
-    our $VERSION = 1.001;
+    our $VERSION = 1.002;
     use File::Basename;
 
     sub new {
@@ -95,7 +102,8 @@ package SPLATtr {
         my ($fmt, @args) = @_;
         my $msg = sprintf $fmt,@args;
         print STDERR "Error: $msg\n";
-        print STDERR "Usage: $0 INFILE.splat\n";
+        print STDERR "Usage: $0 [OPTIONS] INFILE.splat..\n";
+        print STDERR "'$0 -h' for help on [OPTIONS]\n";
         exit 2;
     }
 
