@@ -11,7 +11,7 @@ sub findUlamDir {
     # Try to find a neighborly ulam first since installed packages
     # would likely be older
     my $absPath = File::Spec->rel2abs( $scriptPath ) ;
-    while ($absPath ne "") {
+    while ($absPath ne "/") {
         my $maybedir = "$absPath/ULAM";
         if (-x "$maybedir/bin/culam") {
             return $maybedir;
@@ -25,7 +25,7 @@ my $ulamDir = findUlamDir();
 
 sub findMFMDir {  # Only needed for generating makefiles
     my $absPath = File::Spec->rel2abs( $scriptPath ) ;
-    while ($absPath ne "") {
+    while ($absPath ne "/") {
         my $maybedir = "$absPath/MFM";
         if (-x "$maybedir/bin/mfzrun") {
             return $maybedir;
