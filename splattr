@@ -18,7 +18,13 @@ sub findUlamDir {
         }
         $absPath = dirname($absPath);
     }
-    die("Ulam not found: Need ulam repo as a sibling or cousin to $scriptPath");
+    my @env_paths = split(/:/, $ENV{'PATH'});
+    foreach my $path (@env_paths){
+        if (-x "$path/culam") {
+           return dirname($path);
+        }
+    }
+    die("Ulam not found: Need ulam repo as a sibling or cousin to $scriptPath or installed in system path.");
 }
 
 my $ulamDir = findUlamDir();
@@ -32,7 +38,13 @@ sub findMFMDir {  # Only needed for generating makefiles
         }
         $absPath = dirname($absPath);
     }
-    die("MFM not found: Need MFM repo as a sibling or cousin to $scriptPath");
+    my @env_paths = split(/:/, $ENV{'PATH'});
+    foreach my $path (@env_paths){
+        if (-x "$path/mfzrun") {
+            return dirname($path);
+        }
+    }
+    die("MFM not found: Need MFM repo as a sibling or cousin to $scriptPath or installed in system path.");
 }
 
 
