@@ -4,7 +4,8 @@ use warnings;
 use ExtUtils::MakeMaker;
 use File::ShareDir::Install 'install_share';
 
-install_share 'ulam';
+install_share 'lib/ulam';
+install_share 'demos';
 
 WriteMakefile(
     NAME             => 'SPLAT',
