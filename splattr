@@ -1,6 +1,7 @@
 #!/usr/bin/perl -w         # -*- perl -*-
 use File::Basename;
 use File::Spec;
+use File::Sharedir 'dist_dir';
 use Cwd 'abs_path';
 use lib dirname(__FILE__)."/blib/lib";
 use SPLATtr;
@@ -96,7 +97,8 @@ sub compileOneSPLATFile {
 sub buildULAMFiles {
     my ($dirref,@ulamsEtc) = @_;
     my $ulamPath = "$ulamDir/bin/ulam";
-    my $includes = "--sd $scriptPath/lib";
+    my $sharedir = dist_dir('SPLAT');
+    my $includes = "--sd $scriptPath/lib --sd $sharedir";
     if (scalar(keys %{$dirref}) > 0) {
         $includes .= " --sd ".join(" --sd ",keys %{$dirref});
     }
