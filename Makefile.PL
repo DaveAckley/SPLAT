@@ -26,7 +26,7 @@ WriteMakefile(
         #'Foo::Bar::Module' => 5.0401,
 	'File::ShareDir',
     },
-    EXE_FILES => [('splattr', 'lib/SPLATInstance.ulam')],
+    EXE_FILES => [('splattr')],
     dist  => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
     clean => { FILES => 'SPLAT-*' },
 );
