@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w         # -*- perl -*-
 use File::Basename;
 use File::Spec;
-use File::Sharedir 'dist_dir';
+use File::ShareDir 'dist_dir';
 use Cwd 'abs_path';
 use lib dirname(__FILE__)."/blib/lib";
 use SPLATtr;
