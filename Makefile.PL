@@ -4,7 +4,8 @@ use warnings;
 use ExtUtils::MakeMaker;
 use File::ShareDir::Install 'install_share';
 
-install_share 'ulam';
+install_share 'lib/ulam';
+install_share 'demos';
 
 WriteMakefile(
     NAME             => 'SPLAT',
@@ -26,6 +27,7 @@ WriteMakefile(
         #'Foo::Bar::Module' => 5.0401,
 	'File::ShareDir',
     },
+    INSTALLDIRS => 'vendor',
     EXE_FILES => [('splattr')],
     dist  => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
     clean => { FILES => 'SPLAT-*' },
