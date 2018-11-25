@@ -1,6 +1,7 @@
 #!/usr/bin/perl -w         # -*- perl -*-
 use File::Basename;
 use File::Spec;
+use File::ShareDir 'dist_dir';
 use Cwd 'abs_path';
 use lib dirname(__FILE__)."/blib/lib";
 use SPLATtr;
@@ -11,28 +12,40 @@ sub findUlamDir {
     # Try to find a neighborly ulam first since installed packages
     # would likely be older
     my $absPath = File::Spec->rel2abs( $scriptPath ) ;
-    while ($absPath ne "") {
+    while ($absPath ne "/") {
         my $maybedir = "$absPath/ULAM";
         if (-x "$maybedir/bin/culam") {
             return $maybedir;
         }
         $absPath = dirname($absPath);
     }
-    die("Ulam not found: Need ulam repo as a sibling or cousin to $scriptPath");
+    my @env_paths = split(/:/, $ENV{'PATH'});
+    foreach my $path (@env_paths){
+        if (-x "$path/culam") {
+           return dirname($path);
+        }
+    }
+    die("Ulam not found: Need ulam repo as a sibling or cousin to $scriptPath or installed in system path.");
 }
 
 my $ulamDir = findUlamDir();
 
 sub findMFMDir {  # Only needed for generating makefiles
     my $absPath = File::Spec->rel2abs( $scriptPath ) ;
-    while ($absPath ne "") {
+    while ($absPath ne "/") {
         my $maybedir = "$absPath/MFM";
         if (-x "$maybedir/bin/mfzrun") {
             return $maybedir;
         }
         $absPath = dirname($absPath);
     }
-    die("MFM not found: Need MFM repo as a sibling or cousin to $scriptPath");
+    my @env_paths = split(/:/, $ENV{'PATH'});
+    foreach my $path (@env_paths){
+        if (-x "$path/mfzrun") {
+            return dirname($path);
+        }
+    }
+    die("MFM not found: Need MFM repo as a sibling or cousin to $scriptPath or installed in system path.");
 }
 
 
@@ -84,7 +97,8 @@ sub compileOneSPLATFile {
 sub buildULAMFiles {
     my ($dirref,@ulamsEtc) = @_;
     my $ulamPath = "$ulamDir/bin/ulam";
-    my $includes = "--sd $scriptPath/lib";
+    my $sharedir = dist_dir('SPLAT');
+    my $includes = "--sd $scriptPath/lib --sd $sharedir";
     if (scalar(keys %{$dirref}) > 0) {
         $includes .= " --sd ".join(" --sd ",keys %{$dirref});
     }

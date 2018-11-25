@@ -280,7 +280,7 @@ package SPLATtrNodeSentence {
         }
 
         ## Handle CURLY_BODY
-        if ($text =~ /^({)(.*)}$/s) {
+        if ($text =~ /^(\{)(.*)}$/s) {
             my ($delim, $CURLY_BODY) = ($1,$2);
             if ($VERB eq "let") {
                 $self->{s}->printfError($self->{sourceLine},"'let %s' only accepts '= keyexpr', not '%s'",
