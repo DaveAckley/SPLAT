@@ -36,8 +36,6 @@ lib/ulam/SPLATInstance.ulam
 LICENSE
 Makefile.PL
 MANIFEST			This list of files
-MYMETA.json
-MYMETA.yml
 README
 README.md
 splattr
