@@ -1,0 +1,15 @@
+# As described in http://doi.org/cshp
+= element SwapLine
+\color  #222 \symbol  SL
+
+==  Rules
+vote s isa  SwapLine
+
+ s@ -> _.    # Thin  out
+
+ s      .
+  @ ->   .   # Catch  up
+ s      .
+
+ @x -> x@    # Swap on
+ 

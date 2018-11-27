@@ -1,0 +1,353 @@
+#!/usr/bin/perl -w         # -*- perl -*-
+use File::Basename;
+use File::Spec;
+use File::ShareDir 'dist_dir';
+use Cwd 'abs_path';
+use lib dirname(__FILE__)."/blib/lib";
+use SPLATtr;
+
+my $scriptPath = dirname(__FILE__);
+
+sub findUlamDir {
+    # Try to find a neighborly ulam first since installed packages
+    # would likely be older
+    my $absPath = File::Spec->rel2abs( $scriptPath ) ;
+    while ($absPath ne "/") {
+        my $maybedir = "$absPath/ULAM";
+        if (-x "$maybedir/bin/culam") {
+            return $maybedir;
+        }
+        $absPath = dirname($absPath);
+    }
+    my @env_paths = split(/:/, $ENV{'PATH'});
+    foreach my $path (@env_paths){
+        if (-x "$path/culam") {
+           return dirname($path);
+        }
+    }
+    die("Ulam not found: Need ulam repo as a sibling or cousin to $scriptPath or installed in system path.");
+}
+
+my $ulamDir = findUlamDir();
+
+sub findMFMDir {  # Only needed for generating makefiles
+    my $absPath = File::Spec->rel2abs( $scriptPath ) ;
+    while ($absPath ne "/") {
+        my $maybedir = "$absPath/MFM";
+        if (-x "$maybedir/bin/mfzrun") {
+            return $maybedir;
+        }
+        $absPath = dirname($absPath);
+    }
+    my @env_paths = split(/:/, $ENV{'PATH'});
+    foreach my $path (@env_paths){
+        if (-x "$path/mfzrun") {
+            return dirname($path);
+        }
+    }
+    die("MFM not found: Need MFM repo as a sibling or cousin to $scriptPath or installed in system path.");
+}
+
+
+my $DEBUG;
+
+sub compileOneSPLATFile {
+    my ($infile) = @_;
+    my $splattr = SPLATtr->new($infile);
+
+    my $program = SPLATtrNodeProgram->newIfParse($splattr);
+    if (defined $program) {
+#        printf STDERR "$infile: parse OK\n";
+    } else {
+        my $uneatenLine = $splattr->readLine();
+        SPLATtr::printfFatalError($uneatenLine, "Program parse failed");
+        return undef;
+    }
+
+    my $ap = $program->analysisPhase();
+    if (defined $ap) {
+#        printf STDERR "$infile: analysis OK\n";
+        $program = $ap;
+    } else {
+        SPLATtr::printfFatalError($program->{sourceLine}, "Program analysis failed");
+        return undef;
+    }
+
+    my $ret = $program->codegenPhase();
+    if ($ret) {
+#        printf STDERR "$infile: codegen OK\n";
+    } else {
+        SPLATtr::printfFatalError($program->{sourceLine}, "Code generation failed");
+        return undef;
+    }
+    my $errc = $splattr->{errorCount};
+    if ($errc == 0) {
+        my @ret = ($splattr->{outFileDir},$splattr->{outFileName});
+        $program->decircle();
+        printf STDERR "$infile: OK\n";
+        return @ret;
+    }
+    my $errs = "s";
+    $errs = "" if $errc == 1;
+    SPLATtr::printfFatalError($program->{sourceLine}, "%s error%s detected",
+                              $errc,$errs);
+    return undef;
+}
+
+sub buildULAMFiles {
+    my ($dirref,@ulamsEtc) = @_;
+    my $ulamPath = "$ulamDir/bin/ulam";
+    my $sharedir = dist_dir('App-Splattr');
+    my $includes = "--sd $scriptPath/lib --sd $sharedir";
+    if (scalar(keys %{$dirref}) > 0) {
+        $includes .= " --sd ".join(" --sd ",keys %{$dirref});
+    }
+    if ($DEBUG == 1) {
+        $includes = "-g $includes";
+    } elsif ($DEBUG == -1) {
+        $includes = "-o $includes";
+    }
+    my $cmd = "$ulamPath $includes @ulamsEtc";
+    print STDERR "RN:($cmd)\n";
+    my $ret = `$cmd`;
+    if ($ret ne "") {
+        print STDERR "RET($ret)";
+        return 1;
+    }
+    return 1;
+}
+
+sub printLicense {
+    print STDERR << 'EOV';
+splattr: The SPLAT Language Translator
+
+Copyright (C) 2018 Dave Ackley
+Released under GPL3
+
+EOV
+}
+
+sub printVersion {
+    my ($details) = @_;
+    print STDERR $SPLATtr::VERSION."\n";
+}
+
+sub printHelp {
+    print STDERR <<'EOH';
+OPTIONS:
+
+ -g  Turn on debugging in generated code (incompatible with -o)
+
+ -h  Print this help and exit
+
+ -i  Initialize current directory (best if it's empty) for SPLAT programming
+
+ -n  Don't print out splattr licensing information
+
+ -o  Turn on optimization in generated code (incompatible with -g)
+
+ -v  Print out splattr version info
+
+EOH
+}
+
+sub doProjectInitialization {
+    my $DIR = ".";
+    my $realDir = Cwd::realpath $DIR;
+    $realDir =~ /^(.+)$/ or die "Bad path? '$realDir'";  # realpath comes back tainted?
+    $realDir = $1;
+    my $makefile = "$realDir/Makefile";
+    if (-e $makefile) {
+        print STDERR "Directory '$realDir' already has a Makefile -- no changes made\n";
+        exit(1);
+    }
+    open(MAKEFILE,">",$makefile) or die "Can't write '$makefile': $!";
+    print MAKEFILE <<EOF;
+all:	code
+
+code:	FORCE
+	make -C code
+
+clean:	FORCE
+	make -C code clean
+
+run:	FORCE
+	make -C code run
+
+ishtar:	FORCE
+	make -C code ishtar
+
+.PHONY:	FORCE
+EOF
+
+    my $mfmdir = findMFMDir();
+
+    close MAKEFILE or die "Problem writing '$makefile': $!";
+    printf "[Wrote $makefile]\n";
+
+    makeIfNecessary("$realDir/code");
+    makeIfNecessary("$realDir/notes");
+
+    $makefile = "$realDir/code/Makefile";
+
+    open(MAKEFILE,">",$makefile) or die "Can't write '$makefile': $!";
+    print MAKEFILE <<"EOF";
+SPLATTR:=$0
+MFZRUN:=$mfmdir/bin/mfzrun
+EOF
+    print MAKEFILE <<'EOF';
+MFZGEOMETRY:={{2H3}}
+MFZARGS:=$(MFZGEOMETRY) -no-std
+DIR:=$(shell pwd)
+DEMO:=$(shell basename "$(DIR)")
+
+run:	$(DEMO).mfz
+	$(MFZRUN) $^ run $(MFZARGS)
+
+$(DEMO).mfz:	*.splat Makefile* 
+	$(SPLATTR) *.splat $@
+
+clean:	FORCE
+	rm -rf .gen .splatgen *~ ../*~
+
+realclean:	clean
+	rm -f *.mfz
+
+.PHONY:	FORCE
+EOF
+    close MAKEFILE or die "Problem writing '$makefile': $!";
+
+    printf "[Wrote $makefile]\n";
+
+    my $samplesplat = "$realDir/code/MyElement.splat";
+    open(SPLATFILE,">",$samplesplat) or die "Can't write '$samplesplat': $!";
+    print SPLATFILE <<'EOF';
+= element MyElement
+\symbol ME
+\color #f00
+\symmetries all
+
+== Rules
+
+  @_ -> @@
+
+  @  ->  @
+
+EOF
+    close SPLATFILE or die "Problem writing '$samplesplat': $!";
+
+    printf "[Wrote $samplesplat]\n";
+}
+
+sub makeIfNecessary {
+    my $dir = shift;
+
+    if (-d $dir) {
+        printf "[Directory '$dir' already exists]\n";
+    } elsif (-e $dir) {
+        die "'$dir' exists but is not a directory, can't continue.\n";
+    } else {
+        mkdir $dir or die "Problem making code directory '$dir': $!";
+        printf "[Created $dir/]\n";
+    }
+}
+
+sub main {
+    my (@args) = @_;
+    my @splatsDied;
+    my @ulamsGenned;
+    my @ulamsSourced;
+    my @mfsFiles;
+    my @splatSourceCandidates;
+    my @splatSources;
+    my %ulamGenDirs;
+    my $mfzfile = undef;
+    my $printLicense = 1;
+    $DEBUG = 0;
+    foreach my $arg (@args) {
+        if ($arg eq "-h") {
+            printHelp();
+            exit 0;
+        }
+        if ($arg eq "-v") {
+            printVersion();
+            exit 0;
+        }
+        if ($arg eq "-n") {
+            $printLicense = 0;
+            next;
+        }
+        if ($arg eq "-i") {
+            SPLATtr::usageDie("%s","-i command must appear alone")
+                if scalar(@args) > 1;
+            doProjectInitialization();
+            exit 0;
+        }
+        if ($arg eq "-g") {
+            SPLATtr::usageDie("%s","-g after -o")
+                if $DEBUG == -1;
+            $DEBUG = 1;
+            next;
+        }
+        if ($arg eq "-o") {
+            SPLATtr::usageDie("%s","-o after -g")
+                if $DEBUG == 1;
+            $DEBUG = -1;
+            next;
+        }
+        if ($arg =~ /.*[.]mfz$/) {
+            SPLATtr::usageDie("%s","Multiple .mfz files ($mfzfile, $arg)")
+                if defined($mfzfile) && $mfzfile ne $arg;
+            $mfzfile = $arg;
+            next;
+        }
+        if ($arg =~ /.*[.]ulam$/) {  # Pass .ulam files through
+            push @ulamsSourced, $arg;
+            next;
+        }
+        if ($arg =~ /.*[.]mfs$/) {  # Pass .mfs files through
+            push @mfsFiles, $arg;
+            next;
+        }
+
+        SPLATtr::usageDie("%s","Not SPLAT file '$arg'")
+            unless $arg =~ /.*[.]splat$/;
+        push @splatSourceCandidates, $arg;
+      
+    }
+
+    SPLATtr::usageDie("%s","No SPLAT (or ulam) files found")
+        if scalar(@splatSourceCandidates) + scalar(@ulamsSourced) == 0;
+    
+    if ($printLicense > 0) {
+        printLicense();
+    }
+
+    foreach my $arg (@splatSourceCandidates) {
+        my ($ulamDir,$ulamfile) = compileOneSPLATFile($arg);
+        if (defined $ulamfile) {
+            push @ulamsGenned, $ulamfile;
+            push @splatSources, $arg;
+            $ulamGenDirs{$ulamDir}++;
+        } else {
+            push @splatsDied, $arg;
+        }
+    }
+
+    if (scalar(@splatsDied) > 0) {
+        print STDERR "SPLAT compilation failed for ".join("\n  ",@splatsDied)."\n";
+        exit 3;
+    }
+
+    $mfzfile = "a.mfz" unless defined $mfzfile;
+        
+    my $ret = buildULAMFiles(\%ulamGenDirs,$mfzfile,@ulamsGenned,@ulamsSourced,@mfsFiles,@splatSources);
+    if (!$ret) {
+        print STDERR "ULAM build failed\n";
+        exit 4;
+    }
+    print STDERR "Done\n";
+    exit 0;
+}
+
+main(@ARGV);

@@ -1,0 +1,153 @@
+#####
+= quark QMembrane. The parent class of inner and outer membrane
+\symmetries all
+
+== Rules: OM management (mostly growing)
+given @ isa OuterMembrane
+given i isa InnerMembrane
+given o isa OuterMembrane
+given q isa QMembrane
+given n : !($curatom is InnerMembrane)
+
+given e : true      // Allow dead sites
+vote  e isa Empty   // Count empty sites
+check e : $nvotes*3u>=$nsites*2u 
+
+vote  f isa QContent // Count up content
+check f : random.oddsOf($nvotes,3)
+
+# Self-stabilization rules
+
+  i_       .@
+  i@   ->  ..    # Square off (complete outer membrane)
+
+  nnn      ...
+  n@n  ->  ._.   # Die off (eliminate isolated outer membrane)
+  nnn      ...
+
+  iii      ...
+  i@i  ->  .i.   # Turn in (eliminate surrounded outer membrane)
+  iii      ...
+
+# Growth rules
+ ee_oqff     ..@....
+ eeo@iff ->  ...i...     # Run out
+ eeoiiff     .......
+
+    eo        ..
+    _oif      o...
+    _@if  ->  @i..       # Break out
+    _oif      o...
+    eo        ..
+
+      ff       ..
+    qiif     ....
+    o@if  -> .i..        # Punch out
+    qiif     ....
+      ff       ..
+
+vote r : $curatom is Empty 
+.     || $curatom is OuterMembrane
+
+    roqf          o...
+    o@if    ->    .i..   # Cave out
+    qiif          ....
+    ffff          ....
+
+# OuterMembrane topology changing rules
+
+   fffff          .....
+  iiiiiii        .......
+ oooo@oooo  ->  ....i....  # Fusion
+  iiiiiii        .......
+   fffff          .....
+
+
+== Rules: IM management (tail shrinking)
+given i isa InnerMembrane
+given o isa OuterMembrane
+
+given @ isa InnerMembrane
+check @ : ($o.$nsites >= 7u) && ($i.$nsites <= 1u)
+
+let x = i|o
+
+  xxx      ...
+  x@x  ->  .o.      # Shrink tail
+  xxx      ...
+
+== Rules: IM management (shrink and die)
+given @ isa InnerMembrane
+given i isa InnerMembrane
+given o isa OuterMembrane
+given q isa QMembrane
+given n : !($curatom is OuterMembrane)
+
+vote  e isa QContent
+check e : $nvotes == 0u // Say no QContent
+
+given f : true   // Allow dead sites
+vote  f : !($curatom is Empty) 
+check f : random.oddsOf(3u*$nvotes+1u,10u)
+
+# Self-stabilization rules
+
+  o_       .@
+  o@   ->  ..       # Square in
+
+  nnn      ...
+  n@n  ->  ._.      # Die in
+  nnn      ...
+
+ _____     .....
+ __oo_     .o...
+  o@o  ->   ...     # Put your cap on
+
+  ooo      ...
+  o@o  ->  .o.      # Turn out
+  ooo      ...
+
+given z : !ew.isLive($cursn)
+
+  o      .
+  @  ->  o        # Scrub universe walls
+  z      .
+
+
+
+# Shrink rules
+ ee_iqff     ..@....
+ eei@off ->  ...o...     # Run in
+ eeiooff     .......
+
+   ei        ..
+   _iof      i...
+   _@of  ->  @o..        # Break in
+   _iof      i...
+   ei        ..
+
+      ff       ..
+    qoof     ....
+    i@of  -> .o..        # Punch in
+    qoof     ....
+      ff       ..
+
+vote r : $curatom is Empty 
+.     || $curatom is InnerMembrane
+
+   riqf          i...
+   i@of    ->    .o..     # Cave in
+   qoof          ....
+   ffff          ....
+
+# InnerMembrane topology changing rules
+
+    _____          .....
+   ooooooo        .......
+  iiii@iiii  ->  ....o....  # Fission
+   ooooooo        .......
+    _____          .....
+
+== Postrules: Last ditch hold
+
+  @ -> .

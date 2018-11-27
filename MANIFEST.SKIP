@@ -1,0 +1,26 @@
+# Regexes of files to ignore
+
+# SPLAT generated dirs
+\.gen/
+\.splatgen/
+
+# Makemaker generated dirs and files
+^MANIFEST\.
+^Makefile$
+^blib/
+^MakeMaker-\d
+^pm_to_blib    
+
+# Git
+\.git
+
+# internal notes
+^notes-internal/
+
+# Standard detritus
+~$
+^#.*#$
+\.old$
+\.bak$
+
+
