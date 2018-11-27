@@ -6,18 +6,20 @@ use warnings;
 
 =head1 NAME
 
-SPLAT - The great new SPLAT!  Currently with NO EXPOSED API SO THIS DOC ISN'T WORTH MUCH
+App::Splattr - Translator for SPLAT (Spatial Programming Language, Ascii Text)
 
 =head1 VERSION
 
-Version 0.01
+Version 0.02
 
 =cut
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 
 =head1 SYNOPSIS
+
+NOTE THIS MODULE CURRENTLY HAS *NO* *EXPOSED* *API* SO THIS DOC ISN'T WORTH MUCH
 
 USE SPLATTR FROM THE COMMAND LINE
 
