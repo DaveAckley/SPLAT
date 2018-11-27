@@ -8,7 +8,7 @@ install_share 'lib/ulam';
 install_share 'demos';
 
 WriteMakefile(
-    NAME             => 'SPLAT',
+    NAME             => 'App::Splattr',
     AUTHOR           => q{Dave Ackley <ackley@ackleyshack.com>},
     VERSION_FROM     => 'lib/SPLAT.pm',
     ABSTRACT_FROM    => 'lib/SPLAT.pm',
@@ -25,7 +25,7 @@ WriteMakefile(
     PREREQ_PM => {
         #'ABC'              => 1.6,
         #'Foo::Bar::Module' => 5.0401,
-	'File::ShareDir',
+	'File::ShareDir'    => 0,
     },
     INSTALLDIRS => 'vendor',
     EXE_FILES => [('splattr')],
