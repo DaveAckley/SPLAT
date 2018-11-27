@@ -4,6 +4,7 @@ use File::Spec;
 use File::ShareDir 'dist_dir';
 use Cwd 'abs_path';
 use lib dirname(__FILE__)."/blib/lib";
+use SPLAT;
 use SPLATtr;
 
 my $scriptPath = dirname(__FILE__);
@@ -129,7 +130,7 @@ EOV
 
 sub printVersion {
     my ($details) = @_;
-    print STDERR $SPLATtr::VERSION."\n";
+    print STDERR $SPLAT::VERSION."\n";
 }
 
 sub printHelp {
