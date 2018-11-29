@@ -7,6 +7,8 @@ demos/C211/OuterMembrane.splat
 demos/C211/QContent.splat
 demos/C211/QMembrane.splat
 demos/C211/Seed.splat
+demos/DLA/DLA.splat
+demos/DLA/Makefile
 demos/FB/ForkBomb.splat
 demos/FB/Makefile
 demos/makefile.demo-default.mk
@@ -36,8 +38,6 @@ lib/ulam/SPLATInstance.ulam
 LICENSE
 Makefile.PL
 MANIFEST			This list of files
-MYMETA.json
-MYMETA.yml
 README
 README.md
 splattr

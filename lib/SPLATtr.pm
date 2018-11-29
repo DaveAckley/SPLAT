@@ -35,7 +35,6 @@ package SPLATtr {
     use parent "SPLATUrSelf";
     our @ISA;
 
-    our $VERSION = 1.002;
     use File::Basename;
 
     sub new {

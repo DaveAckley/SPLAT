@@ -1,0 +1,88 @@
+# SPLAT-by-example: DLA: Diffusion-Limited Aggregation
+
+= element DLA.  A SPLAT version of the 'original' C++ DLA demo
+\symbol DL
+\color #505
+\symmetries all
+\author Dave Ackley
+\license Public Domain
+
+== Rules
+given r isa Res
+
+  @r -> @@
+
+  @  ->  .
+
+
+= element DLA2.  A DLA that will catch an available Res on every event
+\symbol D2
+\color #707
+#Note: No '\symmetries all' needed (though it would be harmless to include)
+\author Dave Ackley
+\license Public Domain
+
+== Rules
+vote r isa Res
+change r { if ($winsn == $cursn) ew[$cursn] = ew[0]; }
+#   $winsn: Site number that won the vote for this key
+#   $cursn: Site number we're currently examining in this change
+#   So:  "If I am the site that won the vote, copy event center to me."
+
+   r      r
+  r@r -> r@r
+   r      r
+
+   @  ->  .
+
+
+= element DLA3.  A DLA that will catch every available Res on every event
+\symbol D3
+\color #707
+\author Dave Ackley
+\license Public Domain
+
+== Rules
+# Although the difference in dynamics between DLA3 and DLA2 will be
+# small unless Res density is quite high, DLA3 serves to introduce
+# more SPLAT constructs like $curatom
+
+vote r isa Res
+change r { if ($curatom is Res) ew[$cursn] = ew[0]; }
+#   $curatom: The contents of the current site
+#   (Note ulam uses 'is TYPE' where SPLAT uses 'isa TYPE')
+#   $cursn: Site number we're currently examining in this change
+#   So:  "If I contain a Res, copy event center to me."
+
+   r      r
+  r@r -> r@r
+   r      r
+
+   @  ->  .
+
+
+= element DLA4.  DLA3 done in one rule
+\symbol D4
+\color #909
+\author Dave Ackley
+\license Public Domain
+
+== Rules
+
+vote r isa Res
+check r : $nvotes >= 0u
+# Note: 'check r : true' would be a simpler way to do this, since
+# $nvotes is unsigned so '$nvotes >= 0u' can't be false, but this way
+# demonstrates the '$nvotes' special variable -- and also demonstrates
+# the common need to make constants explicitly unsigned for ulam --
+# '$nvotes >= 0' won't compile.
+
+change r { if ($curatom is Res) ew[$cursn] = ew[0]; }
+
+   r      r
+  r@r -> r@r
+   r      r
+
+# Note no @ -> . 'hold rule' needed!
+
+
