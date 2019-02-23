@@ -10,11 +10,11 @@ App::Splattr - Translator for SPLAT (Spatial Programming Language, Ascii Text)
 
 =head1 VERSION
 
-Version 1.004
+Version 1.005
 
 =cut
 
-our $VERSION = '1.004';
+our $VERSION = '1.005';
 
 
 =head1 SYNOPSIS
