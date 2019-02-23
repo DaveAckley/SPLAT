@@ -24,6 +24,8 @@ package SPLATtrNodeSection {
         my $errors = 0;
         for (my $u = 0; $u < scalar @{$self->{sectionBodyUnits}}; ++$u) {
             my $a = $self->{sectionBodyUnits}->[$u]->analysisPhase($self,@parents);
+
+#print "NODESECANAPHA <$a>".::Dumper($self->{sectionBodyUnits}->[$u])."\n";
             if (defined($a)) {
                 $self->{sectionBodyUnits}->[$u] = $a;
             } else {

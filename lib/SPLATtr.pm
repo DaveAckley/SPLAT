@@ -2,6 +2,7 @@ use strict;
 use warnings;
 use diagnostics;
 use Carp;
+use Data::Dumper;
 
 require SPLATSourceLine;
 require SPLATUrSelf;
@@ -23,6 +24,8 @@ require SPLATtrNodeUnit;
 require SPLATtrNodeUnitSpatialBlock;
 
 ### VERSION HISTORY
+#
+# 2.001 2019/02/22 First significant updates
 #
 # 1.002 2018/11/07 First released version
 #

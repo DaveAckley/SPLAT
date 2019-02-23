@@ -9,6 +9,7 @@ package SPLATtrNodeSectionSplatRules {
             className => $params{className},
             ruleOrder => $params{ruleOrder},
             keysets => {},  # hash of KeyCode => KeySet
+            scratchVars => [], # array[0..9] of init code
             );
         SPLATUrSelf::crash("Missing section level") 
             unless defined $self->{sectionLevel};
@@ -75,6 +76,8 @@ package SPLATtrNodeSectionSplatRules {
         for my $key (sort keys %{$self->{keysets}}) {
             $self->crash() unless SPLATtrNodeKeySet::isKeyCode($key);
             my $val = $self->{keysets}->{$key};
+#            print "CGP:::: ".::Dumper($val)."\n";
+#            print "SELFCGP:::: ".::Dumper($self)."\n";
             return 0 unless $val->codegenKeySetForClass($self,@parents);
         }
 
@@ -142,6 +145,12 @@ package SPLATtrNodeSectionSplatRules {
             my $dm = $ksmap{$ks};
             print $out
                 "    $dm.define('$ks');\n";
+        }
+        foreach my $idx (0..9) {
+            my $scratchinit = $self->{scratchVars}->[$idx];
+            next unless defined $scratchinit;
+            print $out
+                "     m_scratchVars[$idx] = (\n$scratchinit\n);\n";
         }
         print $out 
             "  }\n";

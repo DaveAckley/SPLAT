@@ -79,7 +79,7 @@ package SPLATtrNodeKeySet {
             inClassName => $params{inClassName},
             keyCode => $params{keyCode},
             rulesetNumber => $params{rulesetNumber},
-            overrides => {},  # type -> [$delim, optisa, delim-specific-body]
+            overrides => {},  # type -> [$delim, optisa, delim-specific-body, source-line]
             );
         $self->crash("Missing class name") unless defined $self->{inClassName};
         $self->crash("Missing key code") unless defined $self->{keyCode};
@@ -148,6 +148,7 @@ package SPLATtrNodeKeySet {
 
         foreach my $override (sort keys %{$self->{overrides}}) {
             my $overridebody = $self->{overrides}->{$override};
+#            print "LDKLSDLKDSKLDS ".::Dumper($overridebody)."\n";
             $self->codegenOverrideForKeySet($out,$override,$overridebody);
         }
         print $out "} // transient $fullname\n";
@@ -155,7 +156,7 @@ package SPLATtrNodeKeySet {
     }
 
     sub codegenMapDollaVars {
-        my ($self,$body,$override,$selfVarOrUndef) = @_;
+        my ($self,$body,$override,$overridesourceline,$selfVarOrUndef) = @_;
         while ($body =~ /^(.*?)[\$]([a-zA-Z]+)([^a-zA-Z].*|)$/s) {
             my ($pre,$dolla,$post) = ($1,$2,$3);
             # Is this a special dollar variable
@@ -169,7 +170,7 @@ package SPLATtrNodeKeySet {
                         if (defined($selfVarOrUndef)) {
                             $body = $pre.$selfVarOrUndef.$post;
                         } else {
-                            $self->{s}->printfError($self->{sourceLine},"'\$%s' illegal in non-isa '%s %s' code starting here",
+                            $self->{s}->printfError($overridesourceline,"'\$%s' illegal in non-isa '%s %s' code starting here",
                                                     $dolla,
                                                     $override,
                                                     $self->{keyCode});
@@ -182,7 +183,7 @@ package SPLATtrNodeKeySet {
                     # OK, all good (not bothering to warn about posssible instability)
                     $body = $pre.$translation.$post;
                 } else {
-                    $self->{s}->printfError($self->{sourceLine},"'\$%s' illegal in '%s %s' code starting here",
+                    $self->{s}->printfError($overridesourceline,"'\$%s' illegal in '%s %s' code starting here",
                                             $dolla,
                                             $override,
                                             $self->{keyCode});
@@ -192,7 +193,7 @@ package SPLATtrNodeKeySet {
                 my $kcrefcode = "($rsvar.getKeyState('$dolla'))";  # Yeah, go hunt down its key state
                 $body = $pre.$kcrefcode.$post;
             } else {
-                $self->{s}->printfError($self->{sourceLine},"Undefined '\$%s' special variable in '%s %s' code starting here",
+                $self->{s}->printfError($overridesourceline,"Undefined '\$%s' special variable in '%s %s' code starting here",
                                         $dolla,
                                         $override,
                                         $self->{keyCode});
@@ -290,7 +291,7 @@ package SPLATtrNodeKeySet {
 
     sub codegenOverrideForKeySet {
         my ($self,$out,$override,$ksr) = @_;
-        my ($delim, $optisa, $overridebody) = @{$ksr};
+        my ($delim, $optisa, $overridebody,$overridesourceline) = @{$ksr};
         my $origbody = $overridebody;
         my $prefix = "  // ";
         my $echoBack;
@@ -380,6 +381,12 @@ package SPLATtrNodeKeySet {
             $body .= "  return interpretGivenExpr(givenExpr);\n";
         }
 
+        #CGKS given isa : colonbody
+        elsif ($override eq "given" && $hasisa && $delim eq ":" && $overridebody ne "") {
+            $body .= $pre;
+            $body .= "  return (\n$overridebody\n);";
+        }
+
         #CGKS given isa { curlybody }
         elsif ($override eq "given" && $hasisa && $delim eq "{") {
             $body .= $pre;
@@ -451,7 +458,7 @@ package SPLATtrNodeKeySet {
             $self->crash("UNHANDLED CODEGEN");
         }
 
-        my $internal = $self->codegenMapDollaVars($body,$override,$selfvar);
+        my $internal = $self->codegenMapDollaVars($body,$override,$overridesourceline,$selfvar);
         if (!defined $internal) {
             $self->crash("NO INTERNAL FOR($body,$override,$selfvar)");
         }
