@@ -3,6 +3,9 @@
    \color #32c
  */
 element SPLATControl {
+  /** Print rules as they are considered */
+  parameter Bool cPRINT_RULES = false; 
+
   /** Print keyset after given_ */
   parameter Bool cPRINT_GIVEN = false; 
 
@@ -125,7 +128,7 @@ transient SPLATKeyState { // a Key is an ASCII used in LHS and/or RHS of a SPLAT
     Votes lhs = interpretVoteExpr(rs, cursn, curatom, expr, leftPtr);
 
     //// Unop ~
-    if (op == '~') return lhs ? 0u : 1u;
+    if (op == '~') return lhs > 0u ? 0u : 1u;
 
     //// Binop rhs [|&,]
     if (rightPtr == 0)  f.fail(0x51000128);
@@ -440,12 +443,22 @@ transient SPLATKeyStateSelf : SPLATKeyState {
    KeyState definitions
  */
 transient SPLATRuleSet {
+  // Access to parameters
+  SPLATControl splatControl;
+
   // Predefined key states
   SPLATKeyStateSelf m_keyStateSelf;         // For code @
   SPLATKeyStateEmpty m_keyStateEmpty;       // For code _
   SPLATKeyStateAny m_keyStateAny;           // For code .
   SPLATKeyStateOccupied m_keyStateOccupied; // For code ?
   SPLATKeyStateInvalid m_keyStateInvalid;   // For unused codes
+
+  // Scratch vars 0..9
+  typedef Int ScratchVar;
+  ScratchVar m_scratchVars[10];
+  Int & getScratchVar(Int index) {
+    return m_scratchVars[index];
+  }
 
   /** Default getKeyState routine.  If a set of rules involves any
    * custom key code, the generated subclass of SPLATRuleSet must

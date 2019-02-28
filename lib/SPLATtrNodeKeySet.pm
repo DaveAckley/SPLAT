@@ -144,7 +144,7 @@ package SPLATtrNodeKeySet {
         my $cBaseClass = cBaseClassForKeyCode($self->{keyCode});
         $self->crash("Bad keycode name") unless defined($cBaseClass);
 
-        print $out "transient $fullname : $cBaseClass {\n";
+        print $out "\ntransient $fullname : $cBaseClass {\n";
 
         foreach my $override (sort keys %{$self->{overrides}}) {
             my $overridebody = $self->{overrides}->{$override};
@@ -157,8 +157,22 @@ package SPLATtrNodeKeySet {
 
     sub codegenMapDollaVars {
         my ($self,$body,$override,$overridesourceline,$selfVarOrUndef) = @_;
-        while ($body =~ /^(.*?)[\$]([a-zA-Z]+)([^a-zA-Z].*|)$/s) {
-            my ($pre,$dolla,$post) = ($1,$2,$3);
+        while ($body =~ /^(.*?)[\$]((\d+)|[._@?]|[a-zA-Z]+)([^a-zA-Z].*|)$/s) {
+            my ($pre,$dolla,$scratch,$post) = ($1,$2,$3,$4);
+            # Is this a scratch variable reference?
+            if (defined($scratch)) {
+                if ($scratch > 9) {
+                    $self->{s}->printfError($overridesourceline,"'\$%s' illegal scratch var in '%s %s' code starting here",
+                                            $scratch,
+                                            $override,
+                                            $self->{keyCode});
+                    return undef;
+                }
+                my $rsvar = $dollarvarCodeGenInfo{'ruleset'};
+                my $translation = "($rsvar.getScratchVar($scratch))";
+                $body = $pre.$translation.$post;
+                next;
+            }
             # Is this a special dollar variable
             my $translation = $dollarvarCodeGenInfo{$dolla};
             if (defined($translation)) { # Is this a special dolla var?
@@ -189,7 +203,7 @@ package SPLATtrNodeKeySet {
                                             $self->{keyCode});
                     return undef;
                 }
-            } elsif ($dolla =~ /^[a-zA-Z]$/) { # Is this a cross keycode reference?
+            } elsif ($dolla =~ /^[a-zA-Z._@?]$/) { # Is this a cross keycode reference?
                 my $kcrefcode = "($rsvar.getKeyState('$dolla'))";  # Yeah, go hunt down its key state
                 $body = $pre.$kcrefcode.$post;
             } else {

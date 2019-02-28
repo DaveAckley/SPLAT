@@ -143,6 +143,34 @@ package SPLATtrNodeSentence {
         print STDERR "Error: $msg\n";
         abort();
     }
+
+    sub findKeysInKeyExpr {
+        my ($tree) = @_;
+        my $href = {};
+        findKeysInKeyExprFPIF($href,$tree);
+        return $href;
+    }
+
+    sub findKeysInKeyExprFPIF {
+        my ($href, $tree) = @_;
+        printKeyExprDIE("Bad arg '$tree'") unless ref $tree eq "ARRAY";
+        my $len = scalar(@{$tree});
+        printKeyExprDIE("Too short") unless $len > 1;
+        if ($tree->[0] eq "key") {
+            printKeyExprDIE("Too long") unless $len == 2;
+            $href->{$tree->[1]}++;
+            return;
+        }
+        if ($tree->[0] eq "unop") {
+            printKeyExprDIE("Bad size") unless $len == 3;
+            findKeysInKeyExprFPIF($href, $tree->[2]);
+            return;
+        }
+        printKeyExprDie("Bad long length") unless $len == 4;
+        findKeysInKeyExprFPIF($href, $tree->[2]);
+        findKeysInKeyFPIF($href, $tree->[3]);
+    }
+
     sub printKeyExprFPIF {
         my ($out, $tree) = @_;
         printKeyExprDIE("Bad arg '$tree'") unless ref $tree eq "ARRAY";
