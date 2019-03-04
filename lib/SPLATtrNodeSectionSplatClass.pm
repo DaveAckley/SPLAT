@@ -50,11 +50,6 @@ package SPLATtrNodeSectionSplatClass {
             if $blurb eq "" && ref($firstUnit) ne "SPLATtrNodeSententialGroup";
 
         my $errors = 0;
-        if ($blurb ne "") {
-            print $out "/** $blurb\n";
-            $openedComment = 1;
-        }
-
         foreach my $sentence (@{$firstUnit->{sentences}}) {
             my $text = $sentence->getText();
 
@@ -72,6 +67,11 @@ package SPLATtrNodeSectionSplatClass {
         }
 
         print $out $localdefs; # if any
+
+        if ($blurb ne "") {
+            print $out "/** $blurb\n";
+            $openedComment = 1;
+        }
 
         if ($metadata ne "" && !$openedComment) {
             print $out "/** \n";
