@@ -294,6 +294,15 @@ package SPLATtrNodeSentence {
         }
         ($VERB,$text) = ($1,$2);
 
+        ## 201903061236 Check for 'vote max'
+        my $voteMax = undef;
+#        print "CLAMMITEE($VERB,$text)\n";
+        if ($VERB eq 'vote' && $text =~ /^max\s+([^\s].*)$/s) {
+            $voteMax = 1;
+            $text = $1;
+#            print "CLAMMITOE($text,$voteMax)\n";
+        }
+
         ## Get KEY
         my $KEY;
         if ($text !~ /^([a-zA-Z._@?])\s+([^\s].*)$/s) {
@@ -321,7 +330,7 @@ package SPLATtrNodeSentence {
 #print "GOTOPTISA ($OPTISA,$text)\n";
             if (!defined($text) || $text =~ m!^//.*$!) { # isa was all of it, or with just a comment
                 # So default in a colon body
-                $ks->{overrides}->{$VERB} = [":", $OPTISA, "",$self->{sourceLine}];
+                $ks->{overrides}->{$VERB} = [":", $OPTISA, "",$self->{sourceLine},$voteMax];
                 return;
             }
         }
@@ -334,7 +343,7 @@ package SPLATtrNodeSentence {
                                         $KEY, $delim, $ks->{sourceLine});
                 return;
             }
-            $ks->{overrides}->{$VERB} = [$delim, $OPTISA, $CURLY_BODY,$self->{sourceLine}];
+            $ks->{overrides}->{$VERB} = [$delim, $OPTISA, $CURLY_BODY,$self->{sourceLine},$voteMax];
             return;
         }
 
@@ -346,7 +355,7 @@ package SPLATtrNodeSentence {
                                         $KEY, $delim, $ks->{sourceLine});
                 return;
             }
-            $ks->{overrides}->{$VERB} = [$delim, $OPTISA, $COLON_BODY,$self->{sourceLine}];
+            $ks->{overrides}->{$VERB} = [$delim, $OPTISA, $COLON_BODY,$self->{sourceLine},$voteMax];
             return;
         }
 
@@ -370,12 +379,12 @@ package SPLATtrNodeSentence {
 
         if ($VERB eq "let") {
             foreach my $v ("given", "vote") {  ## NOT CHANGE! STALE_ATOM_REF FOLLOWS THAT!
-                $ks->{overrides}->{$v} = [$delim, $OPTISA, $EQUALS_BODY,$self->{sourceLine}];
+                $ks->{overrides}->{$v} = [$delim, $OPTISA, $EQUALS_BODY,$self->{sourceLine},$voteMax];
             }
             return;
         }
 
-        $ks->{overrides}->{$VERB} = [$delim, $OPTISA, $EQUALS_BODY,$self->{sourceLine}];
+        $ks->{overrides}->{$VERB} = [$delim, $OPTISA, $EQUALS_BODY,$self->{sourceLine},$voteMax];
 
     }
 }

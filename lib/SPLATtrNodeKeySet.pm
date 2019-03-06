@@ -141,8 +141,17 @@ package SPLATtrNodeKeySet {
             unless defined($cKeyCodeName);
 
         my $fullname = "SPLATKeyState_$lexrsn${className}_$cKeyCodeName";
+
         my $cBaseClass = cBaseClassForKeyCode($self->{keyCode});
         $self->crash("Bad keycode name") unless defined($cBaseClass);
+
+
+        my $voteOverride = $self->{overrides}->{vote};
+        if (defined($voteOverride) && defined($voteOverride->[4]) && $voteOverride->[4]) {
+            $cBaseClass .= 'Max';
+#            print "CLLLANNDNDIOOOOIL($voteOverride,$cBaseClass)\n"
+        }
+#        print "FNNFFNOIIIIL() ".::Dumper($self->{overrides})."\n";
 
         print $out "\ntransient $fullname : $cBaseClass {\n";
 
@@ -305,7 +314,8 @@ package SPLATtrNodeKeySet {
 
     sub codegenOverrideForKeySet {
         my ($self,$out,$override,$ksr) = @_;
-        my ($delim, $optisa, $overridebody,$overridesourceline) = @{$ksr};
+        my ($delim, $optisa, $overridebody, $overridesourceline, $voteMax) = @{$ksr};
+        $voteMax ||= 0;
         my $origbody = $overridebody;
         my $prefix = "  // ";
         my $echoBack;
@@ -315,12 +325,12 @@ package SPLATtrNodeKeySet {
             SPLATtrNodeSentence::printKeyExpr($str_fh, $overridebody);
             close $str_fh or die "$!";
             $echoBack =
-                SPLATtr::prefixIndent($prefix,"$override ".$self->{keyCode}." ".
+                SPLATtr::prefixIndent($prefix,"$override ".($voteMax?"max ":"").$self->{keyCode}." ".
                                       ($optisa?"isa $optisa ":" ").
                                       "= $expr");
         } else {
             $echoBack =
-                SPLATtr::prefixIndent($prefix,"$override ".$self->{keyCode}." ".
+                SPLATtr::prefixIndent($prefix,"$override ".($voteMax?"max ":"").$self->{keyCode}." ".
                                       ($optisa?"isa $optisa ":" ").
                                       ($overridebody eq ""?"":"$delim $overridebody"));
         }
