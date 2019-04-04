@@ -33,6 +33,9 @@ package SPLATtrNodeSectionSplatClass {
         my $blurb = $self->{sectionBlurb};
         $blurb = "" unless defined $blurb;
 
+        my $metadata = "";
+        my $localdefs = "";
+
         # We'll check if there's an initial sentential group in the
         # sectionBodyUnits.  If so, we'll scan it for lines beginning
         # with '\' and assume they are metadata.  And I guess, for
@@ -47,39 +50,46 @@ package SPLATtrNodeSectionSplatClass {
             if $blurb eq "" && ref($firstUnit) ne "SPLATtrNodeSententialGroup";
 
         my $errors = 0;
+        foreach my $sentence (@{$firstUnit->{sentences}}) {
+            my $text = $sentence->getText();
+
+            if ($text =~ /^[\\]/) {
+                $metadata .= "  $text\n";
+                next;
+            }
+            if ($text =~ /^(local .*)$/) {
+                $localdefs .= "$1\n";
+            } else {
+                $self->{s}->printfError($sentence->{sourceLine},"Sentence does not look like metadata or local def");
+                ++$errors;
+            }
+            next;
+        }
+
+        print $out $localdefs; # if any
+
         if ($blurb ne "") {
             print $out "/** $blurb\n";
             $openedComment = 1;
         }
 
-        foreach my $sentence (@{$firstUnit->{sentences}}) {
-            my $text = $sentence->getText();
-            if ($text !~ /^[\\]/) {
-                $self->{s}->printfError($sentence->{sourceLine},"Sentence does not look like metadata");
-                ++$errors;
-                next;
-            } 
-            if (!$openedComment) {
-                print $out "/** \n";
-                $openedComment = 1;
-            }
-            print $out "  $text";
+        if ($metadata ne "" && !$openedComment) {
+            print $out "/** \n";
+            $openedComment = 1;
         }
+        
+        print $out $metadata; # if any
 
         if ($openedComment) {
             print $out " */\n";
         }
+
+
         return 1;
     }
 
     sub codegenPhase {
         my ($self,@parents) = @_;
-        ### PART I: Do the rulesets
-        for (my $u = 0; $u < scalar @{$self->{ruleSets}}; ++$u) {
-            my $rs = $self->{ruleSets}->[$u];
-            $self->crash("Not ruleset") unless (ref $rs eq "SPLATtrNodeSectionSplatRules");
-            return 0 unless $rs->codegenPhase($self,@parents);
-        }
 
         ### PART II: Start the class itself
         my $out = $self->{s}->{outHandle};
@@ -172,7 +182,14 @@ package SPLATtrNodeSectionSplatClass {
         ### PART VI: End the class
         print $out
             "\n} // $cat $className\n";
-        
+
+        ### PART I: Do the rulesets
+        for (my $u = 0; $u < scalar @{$self->{ruleSets}}; ++$u) {
+            my $rs = $self->{ruleSets}->[$u];
+            $self->crash("Not ruleset") unless (ref $rs eq "SPLATtrNodeSectionSplatRules");
+            return 0 unless $rs->codegenPhase($self,@parents);
+        }
+
         return 1; 
     }
 

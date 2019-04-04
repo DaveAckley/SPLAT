@@ -94,8 +94,9 @@ package SPLATtrNodeSentence {
         my ($self) = @_;
         my $text = $self->getText();
         chomp $text;
-        if ($text =~ /^(u(lam)?)\s+(.*)$/s) {
-            my ($verb,$rest) = ($1,$3);
+        if ($text =~ /^(u(lam)?)(\s+(.*))?$/s) {
+            my ($verb,$rest) = ($1,$4);
+            $rest ||= "";
             return $rest;
         }
         return undef;
@@ -112,7 +113,7 @@ package SPLATtrNodeSentence {
     #    ISA_BODY <- "isa" ULAM_TYPE DELIM_BODY
     #
     #  COLON_BODY <- ":" ULAM_BOOL_EXPR
-    # EQUALS_BODY <- "=" KEY_EXPR 
+    # EQUALS_BODY <- "=" KEY_EXPR
     #  CURLY_BODY <- "{" regex(.*) "}" EOS
     #
     #    KEY_EXPR <- KEY_FACTOR | KEY_EXPR "," KEY_FACTOR
@@ -142,6 +143,34 @@ package SPLATtrNodeSentence {
         print STDERR "Error: $msg\n";
         abort();
     }
+
+    sub findKeysInKeyExpr {
+        my ($tree) = @_;
+        my $href = {};
+        findKeysInKeyExprFPIF($href,$tree);
+        return $href;
+    }
+
+    sub findKeysInKeyExprFPIF {
+        my ($href, $tree) = @_;
+        printKeyExprDIE("Bad arg '$tree'") unless ref $tree eq "ARRAY";
+        my $len = scalar(@{$tree});
+        printKeyExprDIE("Too short") unless $len > 1;
+        if ($tree->[0] eq "key") {
+            printKeyExprDIE("Too long") unless $len == 2;
+            $href->{$tree->[1]}++;
+            return;
+        }
+        if ($tree->[0] eq "unop") {
+            printKeyExprDIE("Bad size") unless $len == 3;
+            findKeysInKeyExprFPIF($href, $tree->[2]);
+            return;
+        }
+        printKeyExprDie("Bad long length") unless $len == 4;
+        findKeysInKeyExprFPIF($href, $tree->[2]);
+        findKeysInKeyFPIF($href, $tree->[3]);
+    }
+
     sub printKeyExprFPIF {
         my ($out, $tree) = @_;
         printKeyExprDIE("Bad arg '$tree'") unless ref $tree eq "ARRAY";
@@ -152,7 +181,7 @@ package SPLATtrNodeSentence {
             printKeyExprDIE("Too long") unless $len == 2;
             print $out "$tree->[1]";
             return;
-        } 
+        }
         if ($tree->[0] eq "unop") {
             printKeyExprDIE("Bad size") unless $len == 3;
             print $tree->[1];
@@ -185,7 +214,7 @@ package SPLATtrNodeSentence {
         while (matchTok(",",$tr)) {
             my $f2 = $self->parseKeyFactor($tr);
             $factor = ["expr", ",", $factor, $f2];
-        } 
+        }
         return $factor;
     }
     sub parseKeyFactor {
@@ -240,6 +269,23 @@ package SPLATtrNodeSentence {
         $self->crash("Bad arg") unless ref($ruleset) eq "SPLATtrNodeSectionSplatRules";
         my $text = $self->getText();
         chomp $text;
+        ## Check for SCRATCH var decl
+        if ($text =~ /^scratch\s+([^\s].*)$/s) {
+            my $rest = $1;
+            if ($rest !~ /^(\d)\s*(=\s*([^\s].*))?$/s) {
+                $self->{s}->printfError($self->{sourceLine},"Malformed scratch arguments '%s'",$rest);
+                return;
+            }
+            my ($scratchnum,$init) = ($1,$3 || 0);
+            my $scratchinit = $ruleset->{scratchInits}->[$scratchnum];
+            if (defined($scratchinit)) {
+                $self->{s}->printfError($self->{sourceLine},"scratch %s already defined",$scratchnum);
+                return;
+            }
+            $ruleset->{scratchInits}->[$scratchnum] = $init;
+            return;
+        }
+
         ## Get VERB
         my $VERB;
         if ($text !~ /^(given|vote|check|change|let)\s+([^\s].*)$/s) {
@@ -247,6 +293,15 @@ package SPLATtrNodeSentence {
             return;
         }
         ($VERB,$text) = ($1,$2);
+
+        ## 201903061236 Check for 'vote max'
+        my $voteMax = undef;
+#        print "CLAMMITEE($VERB,$text)\n";
+        if ($VERB eq 'vote' && $text =~ /^max\s+([^\s].*)$/s) {
+            $voteMax = 1;
+            $text = $1;
+#            print "CLAMMITOE($text,$voteMax)\n";
+        }
 
         ## Get KEY
         my $KEY;
@@ -262,8 +317,9 @@ package SPLATtrNodeSentence {
         # (Check multiple def)
 
         if (defined($ks->{overrides}->{$VERB})) {
+            my $overridesourceline = $ks->{overrides}->{$VERB}->[3];
             $self->{s}->printfError($self->{sourceLine},"Key code '%s' already has %s definition at %s",
-                                    $KEY, $VERB, $ks->{sourceLine});
+                                    $KEY, $VERB, $overridesourceline);
             return;
         }
 
@@ -271,23 +327,23 @@ package SPLATtrNodeSentence {
         my $OPTISA = undef;
         if ($text =~ /^isa\s+([A-Z][A-Za-z0-9_]*)\s*([^\s].*)?$/s) {
             ($OPTISA,$text) = ($1,$2);
-
+#print "GOTOPTISA ($OPTISA,$text)\n";
             if (!defined($text) || $text =~ m!^//.*$!) { # isa was all of it, or with just a comment
                 # So default in a colon body
-                $ks->{overrides}->{$VERB} = [":", $OPTISA, ""];
+                $ks->{overrides}->{$VERB} = [":", $OPTISA, "",$self->{sourceLine},$voteMax];
                 return;
             }
         }
 
         ## Handle CURLY_BODY
-        if ($text =~ /^(\{)(.*)}$/s) {
+        if ($text =~ /^(\{)(.*)}\s*$/s) {
             my ($delim, $CURLY_BODY) = ($1,$2);
             if ($VERB eq "let") {
                 $self->{s}->printfError($self->{sourceLine},"'let %s' only accepts '= keyexpr', not '%s'",
                                         $KEY, $delim, $ks->{sourceLine});
                 return;
             }
-            $ks->{overrides}->{$VERB} = [$delim, $OPTISA, $CURLY_BODY];
+            $ks->{overrides}->{$VERB} = [$delim, $OPTISA, $CURLY_BODY,$self->{sourceLine},$voteMax];
             return;
         }
 
@@ -299,7 +355,7 @@ package SPLATtrNodeSentence {
                                         $KEY, $delim, $ks->{sourceLine});
                 return;
             }
-            $ks->{overrides}->{$VERB} = [$delim, $OPTISA, $COLON_BODY];
+            $ks->{overrides}->{$VERB} = [$delim, $OPTISA, $COLON_BODY,$self->{sourceLine},$voteMax];
             return;
         }
 
@@ -310,7 +366,7 @@ package SPLATtrNodeSentence {
         }
         my $delim;
         ($delim, $text) = ($1,$2);
-        
+
         # First eat comments
         $text =~ s/#.*?$//mg;
 
@@ -323,12 +379,12 @@ package SPLATtrNodeSentence {
 
         if ($VERB eq "let") {
             foreach my $v ("given", "vote") {  ## NOT CHANGE! STALE_ATOM_REF FOLLOWS THAT!
-                $ks->{overrides}->{$v} = [$delim, $OPTISA, $EQUALS_BODY];
+                $ks->{overrides}->{$v} = [$delim, $OPTISA, $EQUALS_BODY,$self->{sourceLine},$voteMax];
             }
             return;
         }
 
-        $ks->{overrides}->{$VERB} = [$delim, $OPTISA, $EQUALS_BODY];
+        $ks->{overrides}->{$VERB} = [$delim, $OPTISA, $EQUALS_BODY,$self->{sourceLine},$voteMax];
 
     }
 }

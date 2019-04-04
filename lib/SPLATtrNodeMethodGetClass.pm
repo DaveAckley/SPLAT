@@ -22,6 +22,10 @@ package SPLATtrNodeMethodGetClass {
     }
 
     ## XX This needs to be generalized to include a dollavarinfo arg and moved higher
+    ## (e.g., compare with codegenMapDollaVars in SPLATtrNodeKeySet.pm)
+    ## Currently this is called (only? mainly?) for mapping the getcolor special function
+    ## In particular, it is NOT called for keyset bodies, which is where scratch vars like
+    ## $0 are legal, so we don't accept them here.
     sub mapSpecialVars {
         my ($self, $body) = @_;
         my $errors = 0;

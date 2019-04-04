@@ -3,6 +3,21 @@
    \color #32c
  */
 element SPLATControl {
+  /** Print rules as they are considered */
+  parameter Bool cPRINT_RULES = false; 
+
+  /** Print givens as they are considered */
+  parameter Bool cPRINT_GIVENS = false; 
+
+  /** Print votes as they are considered */
+  parameter Bool cPRINT_VOTES = false; 
+
+  /** Print checks as they are considered */
+  parameter Bool cPRINT_CHECKS = false; 
+
+  /** Print changes as they are considered */
+  parameter Bool cPRINT_CHANGES = false; 
+
   /** Print keyset after given_ */
   parameter Bool cPRINT_GIVEN = false; 
 
@@ -125,7 +140,7 @@ transient SPLATKeyState { // a Key is an ASCII used in LHS and/or RHS of a SPLAT
     Votes lhs = interpretVoteExpr(rs, cursn, curatom, expr, leftPtr);
 
     //// Unop ~
-    if (op == '~') return lhs ? 0u : 1u;
+    if (op == '~') return lhs > 0u ? 0u : 1u;
 
     //// Binop rhs [|&,]
     if (rightPtr == 0)  f.fail(0x51000128);
@@ -246,6 +261,15 @@ transient SPLATKeyState { // a Key is an ASCII used in LHS and/or RHS of a SPLAT
   Unsigned m_numberVotes = 0;
   Unsigned getNumberVotes() { return m_numberVotes; }
 
+  // Overridable vote merging routine.  Default behavior is 'standard'
+  // proportional voting: An m_voteValue of 0 cannot win, otherwise
+  // more votes -> 'more chances to win!'.
+  virtual Bool mergeSiteVote(SPLATRuleSet & rs) {
+    Random r;
+    m_numberVotes += (Unsigned) m_voteValue;
+    return r.oddsOf(m_voteValue, m_numberVotes);           // Proportional vote new winner
+  }
+
   // Accessed by $key (defined and stable in all codes)
   ASCII m_keyCode = 0;
   ASCII getKeyCode() { return m_keyCode; }
@@ -343,14 +367,12 @@ transient SPLATKeyState { // a Key is an ASCII used in LHS and/or RHS of a SPLAT
 
     if (m_voteValue == 0u) return 0u;
 
-    m_numberVotes += (Unsigned) m_voteValue;
-    Random r;
-    if (r.oddsOf(m_voteValue, m_numberVotes)) {
+    if (mergeSiteVote(rs)) {      
       m_winnerSN = cursn;          // for now..
       m_winnerAtom = curatom;      // in the clubhouse..  
     }
-
-    return m_voteValue;
+     
+    return m_voteValue;          
   }
 
   Bool check_(SPLATRuleSet & rs) {
@@ -397,9 +419,38 @@ transient SPLATKeyState { // a Key is an ASCII used in LHS and/or RHS of a SPLAT
 
 }
 
+transient MaxVotingAssistant {
+  EventWindow.SiteNum m_ties;
+
+  Bool mergeSiteVoteMax(SPLATKeyState & ks, SPLATRuleSet & rs) {
+    Random r;
+    Unsigned thisVote = (Unsigned) ks.m_voteValue;
+    // Check for new max
+    if (thisVote > ks.m_numberVotes) {  
+      ks.m_numberVotes = thisVote;
+      m_ties = 1u;
+      return true;
+    }
+
+    // Check for tie + luck
+    return thisVote == ks.m_numberVotes && r.oneIn(++m_ties); 
+  }
+}
+
+// Generic superclass for ordinary max-voting key codes
+transient SPLATKeyStateMax : SPLATKeyState {
+  MaxVotingAssistant m_mva;
+  virtual Bool mergeSiteVote(SPLATRuleSet & rs) { return m_mva.mergeSiteVoteMax(self,rs); }
+}
+
 /** '_' abandons the rule unless site is live and empty */
 transient SPLATKeyStateEmpty : SPLATKeyState { 
   virtual Bool given(SPLATRuleSet & rs, SN cursn, Atom & curatom) { return ew.isLive(cursn) && curatom is Empty; } 
+}
+
+transient SPLATKeyStateEmptyMax : SPLATKeyStateEmpty {
+  MaxVotingAssistant m_mva;
+  virtual Bool mergeSiteVote(SPLATRuleSet & rs) { return m_mva.mergeSiteVoteMax(self,rs); }
 }
 
 /** '?' allows any non-empty site and doesn't change anything */
@@ -409,11 +460,21 @@ transient SPLATKeyStateOccupied : SPLATKeyState {
   virtual Void change(SPLATRuleSet & rs, SN cursn, Atom & curatom) { return; } 
 }
 
+transient SPLATKeyStateOccupiedMax : SPLATKeyStateOccupied {
+  MaxVotingAssistant m_mva;
+  virtual Bool mergeSiteVote(SPLATRuleSet & rs) { return m_mva.mergeSiteVoteMax(self,rs); }
+}
+
 /** '.' allows anything in a live or non-live site, and doesn't change anything */
 transient SPLATKeyStateAny : SPLATKeyState { 
   virtual Bool given(SPLATRuleSet & rs, SN cursn, Atom & curatom) { return true; } 
   virtual Votes vote(SPLATRuleSet & rs, SN cursn, Atom & curatom) { return 1; } 
   virtual Void change(SPLATRuleSet & rs, SN cursn, Atom & curatom) { return; } 
+}
+
+transient SPLATKeyStateAnyMax : SPLATKeyStateAny {
+  MaxVotingAssistant m_mva;
+  virtual Bool mergeSiteVote(SPLATRuleSet & rs) { return m_mva.mergeSiteVoteMax(self,rs); }
 }
 
 /** invalid has no key code and fails at everything */
@@ -434,18 +495,33 @@ transient SPLATKeyStateSelf : SPLATKeyState {
     return true;
   } 
 }
+transient SPLATKeyStateSelfMax : SPLATKeyStateSelf {
+  MaxVotingAssistant m_mva;
+  virtual Bool mergeSiteVote(SPLATRuleSet & rs) { return m_mva.mergeSiteVoteMax(self,rs); }
+}
+
 
 /**
    A SPLATRuleSet is a group of rules that share a set of
    KeyState definitions
  */
 transient SPLATRuleSet {
+  // Access to parameters
+  SPLATControl splatControl;
+
   // Predefined key states
   SPLATKeyStateSelf m_keyStateSelf;         // For code @
   SPLATKeyStateEmpty m_keyStateEmpty;       // For code _
   SPLATKeyStateAny m_keyStateAny;           // For code .
   SPLATKeyStateOccupied m_keyStateOccupied; // For code ?
   SPLATKeyStateInvalid m_keyStateInvalid;   // For unused codes
+
+  // Scratch vars 0..9
+  typedef Int ScratchVar;
+  ScratchVar m_scratchVars[10];
+  Int & getScratchVar(Int index) {
+    return m_scratchVars[index];
+  }
 
   /** Default getKeyState routine.  If a set of rules involves any
    * custom key code, the generated subclass of SPLATRuleSet must
@@ -502,8 +578,11 @@ transient SPLATRuleSet {
    A generic routine to evaluate a single rule within a ruleset
  */
 transient SPLATRuleDriver {
+  SPLATControl splatControl;
   typedef EventWindow.SiteNum SN;
+  typedef ByteStreamArray(250u) MsgBuf;
   EventWindow ew;
+  DebugUtils du;
   constant ASCII cEND_OF_LHS = ASCII.maxof;
   constant ASCII cEND_OF_RHS = cEND_OF_LHS-1;
 
@@ -512,6 +591,7 @@ transient SPLATRuleDriver {
     ASCII usedCodes[41];
     Unsigned codesUsed = 0;
     Unsigned rsi = 0; // ruleStringIndex
+    MsgBuf buf;
 
     rs.reset();
 
@@ -526,7 +606,16 @@ transient SPLATRuleDriver {
 
       rs.beginSiteEval();
       SPLATKeyState & ks = rs.getKeyState(keyCode);
-      if (!ks.given_(rs,sn,atom)) return false;
+
+      Bool isGiven = ks.given_(rs,sn,atom);
+
+      if (splatControl.cPRINT_GIVENS) {
+        buf.rewrite();
+        buf.printf(" given %c at %d => %s", keyCode, sn, isGiven ? "true" : "false");
+        du.print((ByteStream&) buf);
+      }
+
+      if (!isGiven) return false;
 
       if (!used[keyCode]) {
         used[keyCode] = true;
@@ -534,14 +623,28 @@ transient SPLATRuleDriver {
         ++codesUsed;
       }
 
-      ks.vote_(rs,sn,atom); // Returns total votes but we don't care?
+      Unsigned votes = ks.vote_(rs,sn,atom); 
+
+      if (splatControl.cPRINT_VOTES) {
+        buf.rewrite();
+        buf.printf(" vote %c at %d => %d", keyCode, sn, votes);
+        du.print((ByteStream&) buf);
+      }
     }
 
     // CHECK once per used keycode
     for (Unsigned i = 0; i < codesUsed; ++i) {
       ASCII keyCode = usedCodes[i];
       SPLATKeyState & ks = rs.getKeyState(keyCode);
-      if (!ks.check_(rs)) return false;
+      Bool isCheck = ks.check_(rs);
+
+      if (splatControl.cPRINT_CHECKS) {
+        buf.rewrite();
+        buf.printf(" check %c => %s", keyCode, isCheck ? "true" : "false");
+        du.print((ByteStream&) buf);
+      }
+
+      if (!isCheck) return false;
     }
 
     // CHANGE at all specified sites
@@ -555,7 +658,14 @@ transient SPLATRuleDriver {
       
       rs.beginSiteEval();
       SPLATKeyState & ks = rs.getKeyState(keyCode);
+
       ks.change_(rs,sn,atom);
+
+      if (splatControl.cPRINT_CHANGES) {
+        buf.rewrite();
+        buf.printf(" change %c at %d", keyCode, sn);
+        du.print((ByteStream&) buf);
+      }
     }
 
     return true;

@@ -25,7 +25,15 @@ package SPLATtrNodePattern {
         my $sb = $lhs->{sb};
 
         my ($lh,$lw) = ($lhs->{height},$lhs->{width});
+        if (!defined($lh) || !defined($lw)) {
+            $self->{s}->printfError($self->{sourceLine},"Undetermined LHS size");
+            return undef;
+        }
         my ($rh,$rw) = ($rhs->{height},$rhs->{width});
+        if (!defined($rh) || !defined($rw)) {
+            $self->{s}->printfError($self->{sourceLine},"Undetermined RHS size");
+            return undef;
+        }
         if ($lh != $rh || $lw != $rw) {
             $self->{s}->printfError($self->{sourceLine},"LHS size ($lh,$lw) doesn't match RHS size ($rh,$rw)");
             return undef;
@@ -79,7 +87,8 @@ package SPLATtrNodePattern {
     }
 
     sub toMultilineString {
-        my ($self,$lineprefix) = @_;
+        my ($self,$lineprefix,$linesuffix) = @_;
+        $linesuffix = "" unless defined $linesuffix;
         # Umm, barf.
         my $ret = $self->{LHS}->toMultilineString($lineprefix);
         my $lhi = $self->{LHS}->{height};
@@ -90,6 +99,9 @@ package SPLATtrNodePattern {
 
         # barf barf barf.
         $ret = $self->{RHS}->toMultilineString(split("\n",$ret));
+
+        # BARF barf barf barf.
+        $ret =~ s/\n/$linesuffix\n/g;
 
         # Come again, have a nice day.
         return $ret;
