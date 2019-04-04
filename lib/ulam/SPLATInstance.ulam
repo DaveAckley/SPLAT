@@ -6,6 +6,18 @@ element SPLATControl {
   /** Print rules as they are considered */
   parameter Bool cPRINT_RULES = false; 
 
+  /** Print givens as they are considered */
+  parameter Bool cPRINT_GIVENS = false; 
+
+  /** Print votes as they are considered */
+  parameter Bool cPRINT_VOTES = false; 
+
+  /** Print checks as they are considered */
+  parameter Bool cPRINT_CHECKS = false; 
+
+  /** Print changes as they are considered */
+  parameter Bool cPRINT_CHANGES = false; 
+
   /** Print keyset after given_ */
   parameter Bool cPRINT_GIVEN = false; 
 
@@ -566,8 +578,11 @@ transient SPLATRuleSet {
    A generic routine to evaluate a single rule within a ruleset
  */
 transient SPLATRuleDriver {
+  SPLATControl splatControl;
   typedef EventWindow.SiteNum SN;
+  typedef ByteStreamArray(250u) MsgBuf;
   EventWindow ew;
+  DebugUtils du;
   constant ASCII cEND_OF_LHS = ASCII.maxof;
   constant ASCII cEND_OF_RHS = cEND_OF_LHS-1;
 
@@ -576,6 +591,7 @@ transient SPLATRuleDriver {
     ASCII usedCodes[41];
     Unsigned codesUsed = 0;
     Unsigned rsi = 0; // ruleStringIndex
+    MsgBuf buf;
 
     rs.reset();
 
@@ -590,7 +606,16 @@ transient SPLATRuleDriver {
 
       rs.beginSiteEval();
       SPLATKeyState & ks = rs.getKeyState(keyCode);
-      if (!ks.given_(rs,sn,atom)) return false;
+
+      Bool isGiven = ks.given_(rs,sn,atom);
+
+      if (splatControl.cPRINT_GIVENS) {
+        buf.rewrite();
+        buf.printf(" given %c at %d => %s", keyCode, sn, isGiven ? "true" : "false");
+        du.print((ByteStream&) buf);
+      }
+
+      if (!isGiven) return false;
 
       if (!used[keyCode]) {
         used[keyCode] = true;
@@ -598,14 +623,28 @@ transient SPLATRuleDriver {
         ++codesUsed;
       }
 
-      ks.vote_(rs,sn,atom); // Returns total votes but we don't care?
+      Unsigned votes = ks.vote_(rs,sn,atom); 
+
+      if (splatControl.cPRINT_VOTES) {
+        buf.rewrite();
+        buf.printf(" vote %c at %d => %d", keyCode, sn, votes);
+        du.print((ByteStream&) buf);
+      }
     }
 
     // CHECK once per used keycode
     for (Unsigned i = 0; i < codesUsed; ++i) {
       ASCII keyCode = usedCodes[i];
       SPLATKeyState & ks = rs.getKeyState(keyCode);
-      if (!ks.check_(rs)) return false;
+      Bool isCheck = ks.check_(rs);
+
+      if (splatControl.cPRINT_CHECKS) {
+        buf.rewrite();
+        buf.printf(" check %c => %s", keyCode, isCheck ? "true" : "false");
+        du.print((ByteStream&) buf);
+      }
+
+      if (!isCheck) return false;
     }
 
     // CHANGE at all specified sites
@@ -619,7 +658,14 @@ transient SPLATRuleDriver {
       
       rs.beginSiteEval();
       SPLATKeyState & ks = rs.getKeyState(keyCode);
+
       ks.change_(rs,sn,atom);
+
+      if (splatControl.cPRINT_CHANGES) {
+        buf.rewrite();
+        buf.printf(" change %c at %d", keyCode, sn);
+        du.print((ByteStream&) buf);
+      }
     }
 
     return true;
