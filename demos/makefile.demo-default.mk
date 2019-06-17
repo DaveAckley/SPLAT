@@ -2,7 +2,7 @@
 SPLATTR:=../../splattr
 MFZRUN:=../../../MFM/bin/mfzrun
 MFZGEOMETRY:={{2H3}}
-MFZARGS:=$(MFZGEOMETRY) -no-std
+MFZARGS:=$(MFZGEOMETRY) --no-std
 DIR:=$(shell pwd)
 DEMO:=$(shell basename "$(DIR)")
 
