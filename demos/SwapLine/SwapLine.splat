@@ -4,6 +4,7 @@
 \symbol SL
 
 ==  Rules
+given s : true
 vote s isa SwapLine
 
  s@ -> _.    # Thin out
