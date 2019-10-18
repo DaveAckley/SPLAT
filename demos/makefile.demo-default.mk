@@ -3,6 +3,8 @@ SPLATTR:=../../splattr
 MFZRUN:=../../../MFM/bin/mfzrun
 MFZGEOMETRY:={{2H3}}
 MFZARGS:=$(MFZGEOMETRY) --no-std
+SPLATTRARGS:=-o
+#SPLATTRARGS:=-g
 DIR:=$(shell pwd)
 DEMO:=$(shell basename "$(DIR)")
 
@@ -10,7 +12,7 @@ run:	$(DEMO).mfz
 	$(MFZRUN) $^ run $(MFZARGS)
 
 $(DEMO).mfz:	*.splat Makefile* ../makefile*
-	$(SPLATTR) *.splat $@
+	$(SPLATTR) $(SPLATTRARGS) *.splat $@
 
 clean:	FORCE
 	rm -rf .gen .splatgen *~ ../*~
