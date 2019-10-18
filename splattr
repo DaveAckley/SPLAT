@@ -99,7 +99,7 @@ sub buildULAMFiles {
     my ($dirref,@ulamsEtc) = @_;
     my $ulamPath = "$ulamDir/bin/ulam";
     my $sharedir = dist_dir('App-Splattr');
-    my $includes = "--sd $scriptPath/lib --sd $sharedir";
+    my $includes = "--sd $scriptPath/lib/ulam --sd $sharedir";
     if (scalar(keys %{$dirref}) > 0) {
         $includes .= " --sd ".join(" --sd ",keys %{$dirref});
     }
