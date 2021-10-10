@@ -168,10 +168,10 @@ sub doProjectInitialization {
     }
     open(MAKEFILE,">",$makefile) or die "Can't write '$makefile': $!";
     print MAKEFILE <<EOF;
-all:	code
+all:	run
 
-code:	FORCE
-	make -C code
+build:	FORCE
+	make -C code build
 
 clean:	FORCE
 	make -C code clean
@@ -202,21 +202,25 @@ MFZRUN:=$mfmdir/bin/mfzrun
 EOF
     print MAKEFILE <<'EOF';
 MFZGEOMETRY:={{2H3}}
-MFZARGS:=$(MFZGEOMETRY) --no-std
+MFZARGS:=$(MFZGEOMETRY)
 DIR:=$(shell pwd)
-DEMO:=$(shell basename "$(DIR)")
+PDIR:=$(realpath ..)
+DEMO:=$(notdir $(PDIR))
+MFZ:=$(PDIR)/$(DEMO).mfz
 
-run:	$(DEMO).mfz
+build:	$(MFZ)
+
+run:	$(MFZ)
 	$(MFZRUN) $^ run $(MFZARGS)
 
-$(DEMO).mfz:	*.splat Makefile* 
+$(MFZ):	*.splat Makefile* 
 	$(SPLATTR) *.splat $@
 
 clean:	FORCE
 	rm -rf .gen .splatgen *~ ../*~
 
 realclean:	clean
-	rm -f *.mfz
+	rm -f $(MFZ)
 
 .PHONY:	FORCE
 EOF
