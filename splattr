@@ -1,4 +1,8 @@
-#!/usr/bin/perl -w         # -*- perl -*-
+#!/usr/bin/perl
+# -*- perl -*-
+
+use strict;
+use warnings;
 use File::Basename;
 use File::Spec;
 use File::ShareDir 'dist_dir';
