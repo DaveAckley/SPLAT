@@ -1,6 +1,7 @@
 use strict;
 use warnings;
-use diagnostics;
+# 202110101359 Do we need this? it's messing with horrible borrible appimage-builder
+# use diagnostics;
 use Carp;
 use Data::Dumper;
 
