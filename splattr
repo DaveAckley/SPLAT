@@ -7,7 +7,7 @@ use File::Basename;
 use File::Spec;
 use File::ShareDir 'dist_dir';
 use Cwd 'abs_path';
-use lib dirname(__FILE__)."/../lib";
+use lib abs_path(abs_path(__FILE__)."/../../lib"); # first resolve __FILE__ if it's a symlink
 use SPLAT;
 use SPLATtr;
 
