@@ -11,7 +11,7 @@ use lib abs_path(abs_path(__FILE__)."/../../lib"); # first resolve __FILE__ if i
 use SPLAT;
 use SPLATtr;
 
-my $scriptPath = dirname(__FILE__);
+my $scriptPath = dirname(abs_path(__FILE__));
 
 sub findUlamDir {
     # Try to find a neighborly ulam first since installed packages
@@ -103,7 +103,7 @@ sub buildULAMFiles {
     my ($dirref,@ulamsEtc) = @_;
     my $ulamPath = "$ulamDir/bin/ulam";
     my $sharedir = dist_dir('App-Splattr');
-    my $includes = "--sd $scriptPath/lib/ulam --sd $sharedir";
+    my $includes = "--sd $scriptPath/../lib/ulam --sd $sharedir";
     if (scalar(keys %{$dirref}) > 0) {
         $includes .= " --sd ".join(" --sd ",keys %{$dirref});
     }
